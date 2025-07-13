@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Scraper Pro</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='images/logo.png') }}">
+</head>
+<body>
+    <header class="header">
+        <div class="container header-content">
+            <div class="logo">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Web Scraper Logo">
+                <span>Web Scraper Pro</span>
+            </div>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="#" class="active"><i class="fas fa-home"></i> Home</a></li>
+                    <li><a href="#"><i class="fas fa-book"></i> Docs</a></li>
+                    <li><a href="#"><i class="fas fa-cog"></i> Settings</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="container">
+            <div class="alerts-container">
+                <div class="alert alert-success" id="successAlert" style="display: none;">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Scraping completed successfully!</span>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="alert alert-error" id="errorAlert" style="display: none;">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span id="errorMessage">An error occurred during scraping.</span>
+                    <button class="close-btn">&times;</button>
+                </div>
+            </div>
+
+            <div class="scraper-card">
+                <div class="card-header">
+                    <h2><i class="fas fa-spider"></i> Web Scraper</h2>
+                    <p>Extract data from any website with our powerful scraping tool</p>
+                </div>
+
+                <form id="scraperForm" class="scraper-form">
+                    <div class="form-group">
+                        <label for="urls"><i class="fas fa-link"></i> Target URLs (one per line)</label>
+                        <textarea id="urls" name="urls" class="form-control" placeholder="https://example.com" required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label><i class="fas fa-sliders-h"></i> Extraction Options</label>
+                        <div class="checkbox-grid">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="extractLinks" name="extractLinks" checked>
+                                <label for="extractLinks">Links</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="extractText" name="extractText" checked>
+                                <label for="extractText">Text Content</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="extractImages" name="extractImages" checked>
+                                <label for="extractImages">Images</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="extractTables" name="extractTables" checked>
+                                <label for="extractTables">Tables</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="textSelector"><i class="fas fa-code"></i> Custom CSS Selector</label>
+                        <input type="text" id="textSelector" name="textSelector" class="form-control" placeholder=".article-content, #main-text">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="requestDelay"><i class="fas fa-clock"></i> Request Delay (s)</label>
+                            <input type="number" id="requestDelay" name="requestDelay" class="form-control" min="0" step="0.1" value="1.0">
+                        </div>
+                        <div class="form-group">
+                            <label for="timeout"><i class="fas fa-hourglass-half"></i> Timeout (s)</label>
+                            <input type="number" id="timeout" name="timeout" class="form-control" min="1" value="10">
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" id="scrapeBtn" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Start Scraping
+                        </button>
+                        <button type="button" id="clearBtn" class="btn btn-secondary">
+                            <i class="fas fa-trash"></i> Clear
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="loading-indicator" id="loadingIndicator" style="display: none;">
+                <div class="spinner"></div>
+                <p>Scraping in progress. Please wait...</p>
+            </div>
+
+            <div class="results-container" id="resultsContainer" style="display: none;">
+                <div class="results-header">
+                    <h3><i class="fas fa-file-alt"></i> Scraping Results</h3>
+                    <div class="export-buttons">
+                        <button id="exportJson" class="btn btn-outline">
+                            <i class="fas fa-file-code"></i> JSON
+                        </button>
+                        <button id="exportCsv" class="btn btn-outline">
+                            <i class="fas fa-file-csv"></i> CSV
+                        </button>
+                    </div>
+                </div>
+
+                <div class="results-tabs">
+                    <button class="tab-btn active" data-tab="summary">Summary</button>
+                    <button class="tab-btn" data-tab="links">Links</button>
+                    <button class="tab-btn" data-tab="text">Text</button>
+                    <button class="tab-btn" data-tab="images">Images</button>
+                    <button class="tab-btn" data-tab="tables">Tables</button>
+                </div>
+
+                <div class="tab-content active" id="summaryTab"></div>
+                <div class="tab-content" id="linksTab"></div>
+                <div class="tab-content" id="textTab"></div>
+                <div class="tab-content" id="imagesTab"></div>
+                <div class="tab-content" id="tablesTab"></div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2023 Web Scraper Pro. All rights reserved.</p>
+            <div class="footer-links">
+                <a href="#">Privacy Policy</a>
+                <a href="#">Terms of Service</a>
+                <a href="#">Contact Us</a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
