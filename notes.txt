@@ -1992,8 +1992,11 @@ INFO:werkzeug:127.0.0.1 - - [14/Jul/2025 13:37:48] "GET /static/css/styles.css H
 INFO:werkzeug:127.0.0.1 - - [14/Jul/2025 13:37:48] "GET /static/js/app.js HTTP/1.1" 304 -
 INFO:werkzeug:127.0.0.1 - - [14/Jul/2025 13:37:48] "GET /static/images/logo.png HTTP/1.1" 200 -
 
+STATUS CODE: 304
 
-
+The HTTP status code 304, "Not Modified", indicates that the requested resource has not been modified 
+since the last time it was accessed by the client. This is a mechanism used for efficient caching, 
+where the browser or other client can reuse a locally stored version of the resource
 
 
 
