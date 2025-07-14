@@ -327,5 +327,1676 @@ This corrected version will:
 🧐NEXT FILES TO CHECK:🧐
 app.py 🧐
 
+Key Improvements Made:
+
+    Fixed Import:
+
+        Changed from web_scraper import WebScraper to from WebScraper import WebScraper to match your filename
+
+    Added Logging:
+
+        Comprehensive logging throughout the application to help with debugging
+
+ Improved Error Handling:
+
+    Better validation of input data
+
+    More specific error messages
+
+    Proper HTTP status codes
+
+Type Safety:
+
+    Added explicit type conversion for delay and timeout
+
+    Ensured boolean values for extraction options
+
+
+File Handling:
+
+    Added UTF-8 encoding for file operations
+
+    Better directory creation handling
+
+    More robust file downloads
+
+URL Validation:
+
+    Better handling of URL input (single string vs list)
+
+    Proper trimming and filtering of URLs
+
+Response Structure:
+
+    More consistent JSON response structure
+
+    Better error messages for the frontend
+
+
+Temporary Directory:
+
+    Ensures temp directory exists at startup
+
+    Better file path handling               
+
+Things to Note:
+
+    Case Sensitivity:
+
+        Make sure your Python file is exactly named WebScraper.py (capital W) to match the import
+
+    Directory Structure:
+
+your-project/
+├── app.py
+├── WebScraper.py
+├── temp/ (will be created automatically)
+├── static/
+└── templates/
+
+Running the Application:
+
+python app.py
+
+    Testing:
+
+        Test with both single URL and multiple URLs
+
+        Verify error cases (empty input, invalid URLs)
+
+        Check file downloads work properly
+
+This version should handle all edge cases better and provide more useful feedback when things go wrong. 
+The logging will help you troubleshoot any issues that arise during development.
+
+                        -------------------------------**DOCUMENTATION**-------------------------------
+Here's a detailed line-by-line documentation of your Flask web scraper application (app.py):
+
+# Import necessary modules
+from flask import Flask, render_template, request, jsonify, send_from_directory
+from WebScraper import WebScraper  # Import your custom WebScraper class
+import os  # For file and directory operations
+import json  # For JSON data handling
+import csv  # For CSV file operations
+from io import StringIO  # For string buffer operations
+from datetime import datetime  # For timestamp generation
+import logging  # For application logging
+
+# Initialize Flask application
+app = Flask(__name__)
+
+# Configure basic logging settings
+logging.basicConfig(level=logging.INFO)
+# Create a logger instance for this module
+logger = logging.getLogger(__name__)
+
+# Define route for the home page
+@app.route('/')
+def index():
+    """Render and return the main index.html template"""
+    return render_template('index.html')
+
+# Define API endpoint for scraping
+@app.route('/api/scrape', methods=['POST'])
+def scrape():
+    """Handle scraping requests from the frontend"""
+    try:
+        # Parse JSON data from the request
+        data = request.get_json()
+        # Log the incoming request
+        logger.info(f"Received scrape request: {data}")
+        
+        # Validate input - check if URLs are provided
+        if not data or 'urls' not in data:
+            logger.error("No URLs provided")
+            return jsonify({'error': 'No URLs provided'}), 400
+            
+        # Ensure URLs is always a list
+        urls = data['urls'] if isinstance(data['urls'], list) else [data['urls']]
+        # Clean and filter URLs
+        urls = [url.strip() for url in urls if url.strip()]
+        
+        # Check if we have valid URLs after cleaning
+        if not urls:
+            logger.error("Empty or invalid URLs provided")
+            return jsonify({'error': 'Empty or invalid URLs provided'}), 400
+        
+        # Initialize WebScraper with configuration
+        scraper = WebScraper(
+            delay=float(data.get('delay', 1.0)),  # Convert to float with default 1.0
+            timeout=int(data.get('timeout', 10))  # Convert to int with default 10
+        )
+        
+        # Configure what to extract from pages
+        config = {
+            'extract_links': bool(data.get('extractLinks', True)),  # Convert to boolean
+            'extract_text': bool(data.get('extractText', True)),
+            'extract_images': bool(data.get('extractImages', True)),
+            'extract_tables': bool(data.get('extractTables', True)),
+            'text_selector': data.get('textSelector') or None  # Use None if empty
+        }
+        
+        # Log the scraping configuration
+        logger.info(f"Starting scrape with config: {config}")
+        
+        # Perform the actual scraping
+        results = scraper.scrape_multiple_pages(urls, config)
+        
+        # Check if we got any results
+        if not results:
+            logger.warning("No results returned from scraper")
+            return jsonify({'error': 'No data was scraped successfully'}), 400
+            
+        # Log successful scraping
+        logger.info(f"Successfully scraped {len(results)} pages")
+        # Return results as JSON
+        return jsonify(results)
+    
+    except Exception as e:
+        # Log any errors that occur during scraping
+        logger.error(f"Scraping failed: {str(e)}", exc_info=True)
+        # Return error message with 500 status code
+        return jsonify({'error': str(e)}), 500
+
+# Define API endpoint for JSON export
+@app.route('/api/export/json', methods=['POST'])
+def export_json():
+    """Handle JSON export requests"""
+    try:
+        # Get JSON data from request
+        data = request.get_json()
+        # Validate data exists
+        if not data:
+            logger.error("No data provided for JSON export")
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Create temp directory if it doesn't exist
+        os.makedirs('temp', exist_ok=True)
+        
+        # Generate unique filename with timestamp
+        filename = f"scraped_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        filepath = os.path.join('temp', filename)
+        
+        # Write JSON data to file with proper encoding
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        
+        # Log successful export
+        logger.info(f"JSON export created: {filename}")
+        # Return success response with filename
+        return jsonify({
+            'filename': filename,
+            'message': 'JSON export created successfully'
+        })
+        
+    except Exception as e:
+        # Log export errors
+        logger.error(f"JSON export failed: {str(e)}")
+        # Return error response
+        return jsonify({'error': str(e)}), 500
+
+# Define API endpoint for CSV export
+@app.route('/api/export/csv', methods=['POST'])
+def export_csv():
+    """Handle CSV export requests"""
+    try:
+        # Get JSON data from request
+        data = request.get_json()
+        # Validate data exists
+        if not data:
+            logger.error("No data provided for CSV export")
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Flatten the data for CSV format
+        flattened_data = []
+        for item in data:
+            flat_item = {
+                'url': item.get('url', ''),
+                'title': item.get('title', ''),
+                'timestamp': item.get('timestamp', ''),
+                'num_links': len(item.get('links', [])),
+                'num_images': len(item.get('images', [])),
+                'num_tables': len(item.get('tables', [])),
+                'text_preview': ' '.join(item.get('text', []))[:200] + '...' if item.get('text') else ''
+            }
+            flattened_data.append(flat_item)
+        
+        # Create temp directory if it doesn't exist
+        os.makedirs('temp', exist_ok=True)
+        
+        # Generate unique filename with timestamp
+        filename = f"scraped_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        filepath = os.path.join('temp', filename)
+        
+        # Write CSV data to file
+        with open(filepath, 'w', newline='', encoding='utf-8') as f:
+            if flattened_data:
+                fieldnames = flattened_data[0].keys()
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(flattened_data)
+        
+        # Log successful export
+        logger.info(f"CSV export created: {filename}")
+        # Return success response with filename
+        return jsonify({
+            'filename': filename,
+            'message': 'CSV export created successfully'
+        })
+        
+    except Exception as e:
+        # Log export errors
+        logger.error(f"CSV export failed: {str(e)}")
+        # Return error response
+        return jsonify({'error': str(e)}), 500
+
+# Define route for file downloads
+@app.route('/download/<filename>')
+def download_file(filename):
+    """Handle file download requests"""
+    try:
+        # Serve file from temp directory as attachment
+        return send_from_directory('temp', filename, as_attachment=True)
+    except Exception as e:
+        # Log download errors
+        logger.error(f"File download failed: {str(e)}")
+        # Return 404 if file not found
+        return jsonify({'error': 'File not found'}), 404
+
+# Main entry point
+if __name__ == '__main__':
+    # Create temp directory if it doesn't exist
+    os.makedirs('temp', exist_ok=True)
+    # Run Flask application in debug mode
+    app.run(debug=True)
+
+
+Key Components Explained:
+
+    Imports Section:
+
+        All necessary modules are imported at the top
+
+        Includes Flask components, file operations, and logging
+
+    Application Setup:
+
+        Flask app initialization
+
+        Logging configuration for tracking application events
+
+Routes:
+
+    / - Main page route that serves the HTML template
+
+    /api/scrape - Handles web scraping requests
+
+    /api/export/json - Handles JSON export requests
+
+    /api/export/csv - Handles CSV export requests
+
+    /download/<filename> - Handles file downloads
+
+
+Error Handling:
+
+    Comprehensive try-catch blocks throughout
+
+    Proper HTTP status codes returned
+
+    Detailed error logging
+
+File Operations:
+
+    Automatic creation of temp directory
+
+    Proper file naming with timestamps
+
+    UTF-8 encoding for international character support
+
+Data Processing:
+
+    Input validation and sanitization
+
+    Data flattening for CSV export
+
+    Proper JSON serialization
+
+
+    Logging:
+
+        Informational logs for normal operations
+
+        Error logs with tracebacks when things go wrong
+
+        Detailed request/response logging
+
+This documentation provides a complete understanding of each line's purpose and how the different 
+components work together to create a robust web scraping application with a Flask backend.    
+
+Here's a detailed line-by-line documentation of your JavaScript code:  app.js
+
+// Wait for the DOM to be fully loaded before executing the script
+document.addEventListener('DOMContentLoaded', function() {
+
+    // ======================
+    // DOM Element References
+    // ======================
+    
+    // Get reference to the main scraper form
+    const scraperForm = document.getElementById('scraperForm');
+    // Get reference to the clear button
+    const clearBtn = document.getElementById('clearBtn');
+    // Get reference to the scrape button
+    const scrapeBtn = document.getElementById('scrapeBtn');
+    // Get reference to the loading indicator element
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    // Get reference to the results container
+    const resultsContainer = document.getElementById('resultsContainer');
+    // Get reference to the success alert element
+    const successAlert = document.getElementById('successAlert');
+    // Get reference to the error alert element
+    const errorAlert = document.getElementById('errorAlert');
+    // Get reference to the error message element
+    const errorMessage = document.getElementById('errorMessage');
+    // Get all tab buttons (NodeList)
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    // Get all tab content sections (NodeList)
+    const tabContents = document.querySelectorAll('.tab-content');
+    // Get reference to the JSON export button
+    const exportJsonBtn = document.getElementById('exportJson');
+    // Get reference to the CSV export button
+    const exportCsvBtn = document.getElementById('exportCsv');
+
+    // ======================
+    // Event Listeners Setup
+    // ======================
+    
+    // Add click event listeners to all close buttons in alerts
+    document.querySelectorAll('.close-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Hide the parent alert element when clicked
+            this.parentElement.style.display = 'none';
+        });
+    });
+
+    // Add click event listener to the clear button
+    clearBtn.addEventListener('click', function() {
+        // Reset the form to its initial state
+        scraperForm.reset();
+        // Hide the results container
+        resultsContainer.style.display = 'none';
+        // Hide the success alert
+        successAlert.style.display = 'none';
+        // Hide the error alert
+        errorAlert.style.display = 'none';
+    });
+
+    // Add click event listeners to all tab buttons
+    tabButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            // Remove 'active' class from all tab buttons
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            // Remove 'active' class from all tab contents
+            tabContents.forEach(content => content.classList.remove('active'));
+            
+            // Add 'active' class to the clicked tab button
+            this.classList.add('active');
+            // Get the data-tab attribute value to identify which content to show
+            const tabId = this.getAttribute('data-tab');
+            // Add 'active' class to the corresponding tab content
+            document.getElementById(`${tabId}Tab`).classList.add('active');
+        });
+    });
+
+    // ======================
+    // Form Submission Handler
+    // ======================
+    
+    // Add submit event listener to the scraper form
+    scraperForm.addEventListener('submit', async function(e) {
+        // Prevent the default form submission behavior
+        e.preventDefault();
+        
+        // Show loading indicator
+        loadingIndicator.style.display = 'flex';
+        // Hide results container
+        resultsContainer.style.display = 'none';
+        // Hide success alert
+        successAlert.style.display = 'none';
+        // Hide error alert
+        errorAlert.style.display = 'none';
+        
+        // Prepare form data for submission
+        const formData = {
+            // Get URLs from textarea, split by newline, trim whitespace, and filter empty lines
+            urls: document.getElementById('urls').value.split('\n')
+                .map(url => url.trim())
+                .filter(url => url !== ''),
+            // Get checkbox states
+            extractLinks: document.getElementById('extractLinks').checked,
+            extractText: document.getElementById('extractText').checked,
+            extractImages: document.getElementById('extractImages').checked,
+            extractTables: document.getElementById('extractTables').checked,
+            // Get text selector value or null if empty
+            textSelector: document.getElementById('textSelector').value || null,
+            // Get delay value, default to 1.0 if empty/invalid
+            delay: parseFloat(document.getElementById('requestDelay').value) || 1.0,
+            // Get timeout value, default to 10 if empty/invalid
+            timeout: parseInt(document.getElementById('timeout').value) || 10
+        };
+
+        try {
+            // Send POST request to the scraping API endpoint
+            const response = await fetch('/api/scrape', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            });
+
+            // Parse the JSON response
+            const data = await response.json();
+            
+            // Check if the response was not OK (status code >= 400)
+            if (!response.ok) {
+                // Throw an error with the server's error message or a default message
+                throw new Error(data.error || 'Failed to scrape');
+            }
+            
+            // Display the results if successful
+            displayResults(data);
+            // Show success alert
+            successAlert.style.display = 'flex';
+            // Show results container
+            resultsContainer.style.display = 'block';
+            
+        } catch (error) {
+            // Log the error to console
+            console.error('Scraping error:', error);
+            // Display the error message in the UI
+            errorMessage.textContent = error.message;
+            // Show error alert
+            errorAlert.style.display = 'flex';
+        } finally {
+            // Always hide the loading indicator when done
+            loadingIndicator.style.display = 'none';
+        }
+    });
+
+    // ======================
+    // Export Button Handlers
+    // ======================
+    
+    // Add click event listener to JSON export button
+    exportJsonBtn.addEventListener('click', function() {
+        // Placeholder for JSON export functionality
+        alert('JSON export functionality would be implemented here');
+    });
+
+    // Add click event listener to CSV export button
+    exportCsvBtn.addEventListener('click', function() {
+        // Placeholder for CSV export functionality
+        alert('CSV export functionality would be implemented here');
+    });
+
+    // ======================
+    // Results Display Function
+    // ======================
+    
+    // Function to display scraping results in the UI
+    function displayResults(data) {
+        // Check if data is empty or invalid
+        if (!data || data.length === 0) {
+            // Show "no data" message in summary tab
+            document.getElementById('summaryTab').innerHTML = '<p>No data was scraped successfully.</p>';
+            return;
+        }
+
+        // Display summary information in the summary tab
+        document.getElementById('summaryTab').innerHTML = `
+            <h4>Scraping Summary</h4>
+            <p>Successfully scraped ${data.length} page(s).</p>
+            <div class="result-item">
+                <div class="result-title">Summary Statistics</div>
+                <div class="result-meta">
+                    <span><i class="fas fa-link"></i> ${data.reduce((acc, page) => acc + (page.links ? page.links.length : 0), 0)} links found</span>
+                    <span><i class="fas fa-image"></i> ${data.reduce((acc, page) => acc + (page.images ? page.images.length : 0), 0)} images found</span>
+                    <span><i class="fas fa-table"></i> ${data.reduce((acc, page) => acc + (page.tables ? page.tables.length : 0), 0)} tables found</span>
+                </div>
+            </div>
+            ${data.map(page => `
+                <div class="result-item">
+                    <div class="result-title">${page.title || 'Untitled Page'}</div>
+                    <div class="result-url">${page.url}</div>
+                    <div class="result-meta">
+                        <span><i class="fas fa-clock"></i> ${new Date(page.timestamp).toLocaleString()}</span>
+                        <span><i class="fas fa-link"></i> ${page.links ? page.links.length : 0} links</span>
+                        <span><i class="fas fa-image"></i> ${page.images ? page.images.length : 0} images</span>
+                        <span><i class="fas fa-table"></i> ${page.tables ? page.tables.length : 0} tables</span>
+                    </div>
+                </div>
+            `).join('')}
+        `;
+
+        // Display links in the links tab
+        document.getElementById('linksTab').innerHTML = data.map(page => `
+            <div class="result-item">
+                <div class="result-title">Links from: ${page.title || 'Untitled Page'}</div>
+                <div class="result-url">${page.url}</div>
+                ${page.links && page.links.length > 0 ? `
+                    <ul class="links-list">
+                        ${page.links.map(link => `<li><a href="${link}" target="_blank" rel="noopener noreferrer">${link}</a></li>`).join('')}
+                    </ul>
+                ` : '<p>No links found on this page.</p>'}
+            </div>
+        `).join('');
+
+        // Display text content in the text tab
+        document.getElementById('textTab').innerHTML = data.map(page => `
+            <div class="result-item">
+                <div class="result-title">Text from: ${page.title || 'Untitled Page'}</div>
+                <div class="result-url">${page.url}</div>
+                ${page.text && page.text.length > 0 ? `
+                    <div class="text-content">
+                        ${page.text.map(text => `<p>${text}</p>`).join('')}
+                    </div>
+                ` : '<p>No text content found on this page.</p>'}
+            </div>
+        `).join('');
+
+        // Display images in the images tab
+        document.getElementById('imagesTab').innerHTML = data.map(page => `
+            <div class="result-item">
+                <div class="result-title">Images from: ${page.title || 'Untitled Page'}</div>
+                <div class="result-url">${page.url}</div>
+                ${page.images && page.images.length > 0 ? `
+                    <div class="image-grid">
+                        ${page.images.map(image => `
+                            <div class="image-item">
+                                <img src="${image.url}" alt="${image.alt}" 
+                                     onerror="this.src='https://via.placeholder.com/200x150?text=Image+Not+Available'">
+                                <div class="image-info">
+                                    <p><strong>Filename:</strong> ${image.filename}</p>
+                                    <p><strong>Alt Text:</strong> ${image.alt || 'None'}</p>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : '<p>No images found on this page.</p>'}
+            </div>
+        `).join('');
+
+        // Display tables in the tables tab
+        document.getElementById('tablesTab').innerHTML = data.map(page => `
+            <div class="result-item">
+                <div class="result-title">Tables from: ${page.title || 'Untitled Page'}</div>
+                <div class="result-url">${page.url}</div>
+                ${page.tables && page.tables.length > 0 ? `
+                    ${page.tables.map((table, index) => `
+                        <h5>Table ${index + 1}</h5>
+                        <div class="table-container">
+                            <table>
+                                ${table.map((row, rowIndex) => `
+                                    <tr>
+                                        ${row.map(cell => `
+                                            ${rowIndex === 0 ? `<th>${cell}</th>` : `<td>${cell}</td>`}
+                                        `).join('')}
+                                    </tr>
+                                `).join('')}
+                            </table>
+                        </div>
+                    `).join('')}
+                ` : '<p>No tables found on this page.</p>'}
+            </div>
+        `).join('');
+    }
+});
+
+Key Features Documented:
+
+DOM Initialization:
+
+    References to all important DOM elements are cached at startup
+
+    Event listeners are set up for interactive elements
+
+Form Handling:
+
+    Comprehensive form submission with validation
+
+    Loading state management
+
+    Error handling with user feedback
+
+Tab System:
+
+    Dynamic tab switching functionality
+
+    Content synchronization between tabs and content panels
+
+
+Data Display:
+
+    Detailed rendering of different data types (links, text, images, tables)
+
+    Fallback content for empty results
+
+    Responsive image handling with error fallbacks
+
+
+
+Error Handling:
+
+    Comprehensive try-catch blocks
+
+    User-friendly error messages
+
+    Console logging for debugging
+
+
+    UI Feedback:
+
+        Loading indicators during operations
+
+        Success/error notifications
+
+        Clear visual state changes
+
+This documentation provides a complete understanding of each component's purpose and how they 
+work together to create a responsive web scraping interface.
+
+
+Here's a thorough line-by-line documentation of your CSS code:
+
+/* ======================= */
+/* CSS Variables (Custom Properties) */
+/* ======================= */
+
+/* Define root-level CSS variables for consistent theming */
+:root {
+    /* Color palette */
+    --primary-color: #4361ee;        /* Main brand blue */
+    --primary-dark: #3a56d4;         /* Darker shade of primary */
+    --secondary-color: #3f37c9;      /* Secondary brand color */
+    --accent-color: #4895ef;         /* Accent color for highlights */
+    --light-color: #f8f9fa;          /* Light background color */
+    --dark-color: #212529;           /* Dark text color */
+    --gray-color: #6c757d;           /* Neutral gray */
+    --light-gray: #e9ecef;           /* Light gray for borders/backgrounds */
+    --success-color: #4cc9f0;        /* Success state color */
+    --warning-color: #f8961e;        /* Warning state color */
+    --danger-color: #f72585;         /* Error/danger state color */
+    
+    /* Design tokens */
+    --border-radius: 8px;            /* Default border radius */
+    --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Default shadow */
+    --transition: all 0.3s ease;     /* Default transition */
+}
+
+/* ======================= */
+/* Base Styles */
+/* ======================= */
+
+/* Reset default browser styles */
+* {
+    margin: 0;               /* Remove default margins */
+    padding: 0;              /* Remove default padding */
+    box-sizing: border-box;  /* Include padding/borders in element dimensions */
+}
+
+/* Base body styles */
+body {
+    font-family: 'Roboto', sans-serif; /* Default font stack */
+    line-height: 1.6;        /* Comfortable line spacing */
+    color: var(--dark-color); /* Default text color */
+    background-color: #f5f7fa; /* Light page background */
+}
+
+/* Container for centered content with max-width */
+.container {
+    max-width: 1200px;       /* Maximum content width */
+    margin: 0 auto;          /* Center horizontally */
+    padding: 0 20px;         /* Horizontal padding */
+}
+
+/* ======================= */
+/* Header Styles */
+/* ======================= */
+
+.header {
+    background-color: white;      /* White header background */
+    box-shadow: var(--box-shadow); /* Subtle shadow */
+    position: sticky;             /* Sticky positioning */
+    top: 0;                       /* Stick to top */
+    z-index: 100;                 /* Ensure header stays above other content */
+}
+
+.header-content {
+    display: flex;                /* Flex layout */
+    justify-content: space-between; /* Space between logo and nav */
+    align-items: center;          /* Vertical centering */
+    padding: 15px 0;             /* Vertical padding */
+}
+
+.logo {
+    display: flex;                /* Flex layout */
+    align-items: center;          /* Center logo and text */
+    font-size: 22px;             /* Logo text size */
+    font-weight: 700;            /* Bold text */
+    color: var(--primary-color); /* Brand color */
+}
+
+.logo img {
+    height: 40px;                /* Fixed logo height */
+    margin-right: 10px;          /* Space between logo and text */
+}
+
+.main-nav ul {
+    display: flex;               /* Horizontal nav */
+    list-style: none;            /* Remove bullets */
+}
+
+.main-nav li {
+    margin-left: 25px;           /* Space between nav items */
+}
+
+.main-nav a {
+    color: var(--gray-color);    /* Default nav color */
+    text-decoration: none;       /* Remove underline */
+    font-weight: 500;            /* Medium weight */
+    display: flex;               /* Flex layout for icons */
+    align-items: center;         /* Center icons with text */
+    transition: var(--transition); /* Smooth color transition */
+}
+
+.main-nav a:hover, 
+.main-nav a.active {
+    color: var(--primary-color); /* Brand color on hover/active */
+}
+
+.main-nav i {
+    margin-right: 8px;           /* Space between icon and text */
+    font-size: 16px;             /* Icon size */
+}
+
+/* ======================= */
+/* Main Content Styles */
+/* ======================= */
+
+.main-content {
+    padding: 40px 0;            /* Vertical spacing */
+}
+
+/* ======================= */
+/* Card Component Styles */
+/* ======================= */
+
+.scraper-card {
+    background-color: white;     /* White card background */
+    border-radius: var(--border-radius); /* Rounded corners */
+    box-shadow: var(--box-shadow); /* Subtle shadow */
+    margin-bottom: 30px;         /* Bottom margin */
+    overflow: hidden;            /* Contain child elements */
+}
+
+.card-header {
+    padding: 25px;              /* Inner spacing */
+    border-bottom: 1px solid var(--light-gray); /* Separator line */
+}
+
+.card-header h2 {
+    margin-bottom: 5px;         /* Space below heading */
+    color: var(--primary-color); /* Brand color */
+}
+
+.card-header p {
+    color: var(--gray-color);   /* Subdued text */
+}
+
+.scraper-form {
+    padding: 25px;              /* Inner spacing */
+}
+
+/* ======================= */
+/* Form Element Styles */
+/* ======================= */
+
+.form-group {
+    margin-bottom: 20px;        /* Space between form groups */
+}
+
+.form-group label {
+    display: block;             /* Make labels block-level */
+    margin-bottom: 8px;         /* Space below label */
+    font-weight: 500;           /* Medium weight */
+    color: var(--dark-color);   /* Dark text */
+}
+
+.form-control {
+    width: 100%;               /* Full width */
+    padding: 12px 15px;        /* Comfortable padding */
+    border: 1px solid #ddd;    /* Light border */
+    border-radius: var(--border-radius); /* Rounded corners */
+    font-size: 16px;           /* Readable text size */
+    transition: var(--transition); /* Smooth transitions */
+}
+
+.form-control:focus {
+    border-color: var(--primary-color); /* Brand color on focus */
+    outline: none;             /* Remove default outline */
+    box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2); /* Focus ring */
+}
+
+textarea.form-control {
+    min-height: 120px;         /* Minimum height */
+    resize: vertical;          /* Allow vertical resizing */
+}
+
+.form-row {
+    display: flex;             /* Side-by-side layout */
+    gap: 20px;                 /* Space between columns */
+}
+
+.form-row .form-group {
+    flex: 1;                   /* Equal width columns */
+}
+
+.checkbox-grid {
+    display: grid;             /* Grid layout */
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); /* Responsive columns */
+    gap: 15px;                 /* Space between items */
+    margin-top: 10px;          /* Space above grid */
+}
+
+.checkbox-item {
+    display: flex;             /* Flex layout */
+    align-items: center;       /* Center checkbox with label */
+}
+
+.checkbox-item input {
+    margin-right: 8px;         /* Space between checkbox and label */
+}
+
+/* ======================= */
+/* Button Styles */
+/* ======================= */
+
+.btn {
+    display: inline-flex;       /* Flex layout */
+    align-items: center;        /* Center vertically */
+    justify-content: center;    /* Center horizontally */
+    padding: 12px 24px;         /* Comfortable padding */
+    border: none;               /* Remove default border */
+    border-radius: var(--border-radius); /* Rounded corners */
+    font-size: 16px;            /* Readable text size */
+    font-weight: 500;           /* Medium weight */
+    cursor: pointer;            /* Pointer cursor */
+    transition: var(--transition); /* Smooth transitions */
+}
+
+.btn i {
+    margin-right: 8px;          /* Space between icon and text */
+}
+
+.btn-primary {
+    background-color: var(--primary-color); /* Brand color */
+    color: white;               /* White text */
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-dark); /* Darker on hover */
+    transform: translateY(-2px); /* Lift effect */
+}
+
+.btn-secondary {
+    background-color: var(--light-gray); /* Light background */
+    color: var(--dark-color);   /* Dark text */
+}
+
+.btn-secondary:hover {
+    background-color: #dee2e6;  /* Slightly darker on hover */
+}
+
+.btn-outline {
+    background-color: transparent; /* Transparent background */
+    border: 1px solid var(--primary-color); /* Brand color border */
+    color: var(--primary-color); /* Brand color text */
+}
+
+.btn-outline:hover {
+    background-color: rgba(67, 97, 238, 0.1); /* Slight tint on hover */
+}
+
+.form-actions {
+    display: flex;             /* Flex layout */
+    gap: 15px;                 /* Space between buttons */
+    margin-top: 25px;          /* Space above button group */
+}
+
+/* ======================= */
+/* Alert Component Styles */
+/* ======================= */
+
+.alerts-container {
+    margin-bottom: 25px;       /* Space below alerts */
+}
+
+.alert {
+    display: flex;             /* Flex layout */
+    align-items: center;       /* Center vertically */
+    padding: 15px;             /* Inner spacing */
+    border-radius: var(--border-radius); /* Rounded corners */
+    margin-bottom: 15px;       /* Space between alerts */
+}
+
+.alert i {
+    margin-right: 10px;        /* Space between icon and text */
+    font-size: 20px;           /* Icon size */
+}
+
+.alert-success {
+    background-color: #d1fae5; /* Light green background */
+    color: #065f46;            /* Dark green text */
+}
+
+.alert-error {
+    background-color: #fee2e2; /* Light red background */
+    color: #b91c1c;            /* Dark red text */
+}
+
+.close-btn {
+    margin-left: auto;         /* Push to right */
+    background: none;          /* Remove background */
+    border: none;              /* Remove border */
+    font-size: 20px;           /* Larger size */
+    cursor: pointer;           /* Pointer cursor */
+    color: inherit;            /* Inherit text color */
+}
+
+/* ======================= */
+/* Loading Indicator Styles */
+/* ======================= */
+
+.loading-indicator {
+    display: flex;             /* Flex layout */
+    flex-direction: column;    /* Stack vertically */
+    align-items: center;       /* Center horizontally */
+    justify-content: center;   /* Center vertically */
+    padding: 40px;             /* Inner spacing */
+    text-align: center;        /* Center text */
+}
+
+.spinner {
+    width: 50px;               /* Fixed width */
+    height: 50px;              /* Fixed height */
+    border: 5px solid rgba(67, 97, 238, 0.2); /* Light border */
+    border-radius: 50%;        /* Circular shape */
+    border-top-color: var(--primary-color); /* Colored top border */
+    animation: spin 1s linear infinite; /* Rotation animation */
+    margin-bottom: 20px;       /* Space below spinner */
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); } /* Full rotation */
+}
+
+/* ======================= */
+/* Results Container Styles */
+/* ======================= */
+
+.results-container {
+    background-color: white;     /* White background */
+    border-radius: var(--border-radius); /* Rounded corners */
+    box-shadow: var(--box-shadow); /* Subtle shadow */
+    overflow: hidden;            /* Contain child elements */
+}
+
+.results-header {
+    display: flex;               /* Flex layout */
+    justify-content: space-between; /* Space between title and buttons */
+    align-items: center;         /* Center vertically */
+    padding: 20px;              /* Inner spacing */
+    border-bottom: 1px solid var(--light-gray); /* Separator line */
+}
+
+.results-header h3 {
+    color: var(--primary-color); /* Brand color */
+}
+
+.export-buttons {
+    display: flex;              /* Flex layout */
+    gap: 10px;                 /* Space between buttons */
+}
+
+.results-tabs {
+    display: flex;              /* Horizontal tabs */
+    border-bottom: 1px solid var(--light-gray); /* Separator line */
+}
+
+.tab-btn {
+    padding: 15px 25px;         /* Comfortable padding */
+    background: none;           /* Remove background */
+    border: none;               /* Remove border */
+    cursor: pointer;            /* Pointer cursor */
+    font-weight: 500;           /* Medium weight */
+    color: var(--gray-color);   /* Default tab color */
+    position: relative;         /* For active indicator */
+    transition: var(--transition); /* Smooth transitions */
+}
+
+.tab-btn:hover {
+    color: var(--primary-color); /* Brand color on hover */
+}
+
+.tab-btn.active {
+    color: var(--primary-color); /* Brand color for active tab */
+}
+
+.tab-btn.active::after {
+    content: '';                /* Empty content */
+    position: absolute;         /* Absolute positioning */
+    bottom: -1px;               /* Align to bottom */
+    left: 0;                    /* Start from left */
+    width: 100%;                /* Full width */
+    height: 3px;                /* Thin line */
+    background-color: var(--primary-color); /* Brand color */
+}
+
+.tab-content {
+    padding: 25px;              /* Inner spacing */
+    display: none;              /* Hidden by default */
+}
+
+.tab-content.active {
+    display: block;             /* Show active tab content */
+}
+
+/* ======================= */
+/* Result Item Styles */
+/* ======================= */
+
+.result-item {
+    margin-bottom: 20px;        /* Space between items */
+    padding: 20px;              /* Inner spacing */
+    border: 1px solid var(--light-gray); /* Light border */
+    border-radius: var(--border-radius); /* Rounded corners */
+    transition: var(--transition); /* Smooth transitions */
+}
+
+.result-item:hover {
+    border-color: var(--accent-color); /* Accent color on hover */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); /* Subtle shadow */
+}
+
+.result-title {
+    font-size: 18px;            /* Larger text */
+    font-weight: 500;           /* Medium weight */
+    margin-bottom: 5px;         /* Space below title */
+    color: var(--primary-color); /* Brand color */
+}
+
+.result-url {
+    color: var(--gray-color);   /* Subdued text */
+    font-size: 14px;            /* Smaller text */
+    margin-bottom: 15px;        /* Space below URL */
+    word-break: break-all;      /* Break long URLs */
+}
+
+.result-meta {
+    display: flex;              /* Flex layout */
+    gap: 20px;                  /* Space between items */
+    font-size: 14px;            /* Smaller text */
+    color: var(--gray-color);   /* Subdued text */
+}
+
+.result-meta span {
+    display: flex;              /* Flex layout */
+    align-items: center;        /* Center icons with text */
+}
+
+.result-meta i {
+    margin-right: 5px;          /* Space between icon and text */
+}
+
+/* ======================= */
+/* Image Grid Styles */
+/* ======================= */
+
+.image-grid {
+    display: grid;              /* Grid layout */
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Responsive columns */
+    gap: 15px;                  /* Space between images */
+    margin-top: 15px;           /* Space above grid */
+}
+
+.image-item {
+    border: 1px solid var(--light-gray); /* Light border */
+    border-radius: var(--border-radius); /* Rounded corners */
+    overflow: hidden;            /* Contain image */
+}
+
+.image-item img {
+    width: 100%;                /* Full width */
+    height: 150px;              /* Fixed height */
+    object-fit: cover;          /* Crop to fit */
+}
+
+.image-info {
+    padding: 10px;              /* Inner spacing */
+    font-size: 13px;            /* Small text */
+}
+
+.image-info p {
+    margin-bottom: 5px;         /* Space between lines */
+    word-break: break-all;      /* Break long filenames */
+}
+
+/* ======================= */
+/* Table Styles */
+/* ======================= */
+
+.table-container {
+    overflow-x: auto;           /* Horizontal scrolling for small screens */
+    margin-top: 15px;           /* Space above table */
+}
+
+table {
+    width: 100%;                /* Full width */
+    border-collapse: collapse;  /* Remove cell spacing */
+}
+
+th, td {
+    padding: 12px 15px;         /* Cell padding */
+    text-align: left;           /* Left-aligned text */
+    border-bottom: 1px solid var(--light-gray); /* Row separator */
+}
+
+th {
+    background-color: var(--light-gray); /* Header background */
+    font-weight: 500;           /* Medium weight */
+}
+
+tr:hover {
+    background-color: rgba(0, 0, 0, 0.02); /* Subtle hover effect */
+}
+
+/* ======================= */
+/* Footer Styles */
+/* ======================= */
+
+.footer {
+    background-color: white;     /* White background */
+    padding: 30px 0;            /* Vertical spacing */
+    border-top: 1px solid var(--light-gray); /* Top border */
+    margin-top: 50px;           /* Space above footer */
+}
+
+.footer p {
+    text-align: center;         /* Centered text */
+    color: var(--gray-color);   /* Subdued text */
+    margin-bottom: 15px;        /* Space above links */
+}
+
+.footer-links {
+    display: flex;              /* Flex layout */
+    justify-content: center;    /* Center horizontally */
+    gap: 20px;                  /* Space between links */
+}
+
+.footer-links a {
+    color: var(--gray-color);   /* Subdued text */
+    text-decoration: none;      /* Remove underline */
+    transition: var(--transition); /* Smooth color transition */
+}
+
+.footer-links a:hover {
+    color: var(--primary-color); /* Brand color on hover */
+}
+
+/* ======================= */
+/* Responsive Styles */
+/* ======================= */
+
+@media (max-width: 768px) {
+    /* Stack header elements vertically on small screens */
+    .header-content {
+        flex-direction: column;
+    }
+
+    /* Adjust navigation spacing */
+    .main-nav ul {
+        margin-top: 15px;
+    }
+
+    .main-nav li {
+        margin-left: 15px;
+        margin-right: 15px;
+    }
+
+    /* Stack form rows vertically */
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    /* Stack results header elements */
+    .results-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    /* Full-width export buttons */
+    .export-buttons {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    /* Allow horizontal scrolling for tabs */
+    .results-tabs {
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    /* Smaller image grid columns on mobile */
+    .image-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+}
+
+Key Features Documented:
+
+    CSS Variables: Centralized theming with custom properties for colors, spacing, and effects
+
+    Reset Styles: Normalized default browser styles for consistent rendering
+
+    Layout System: Responsive container and grid-based layouts
+
+    Component Styles: Comprehensive styling for all UI components (forms, buttons, cards, etc.)
+
+    Interactive States: Hover, focus, and active states with smooth transitions
+
+    Utility Classes: Reusable styles for common patterns (alerts, loading indicators)
+
+    Responsive Design: Mobile-first approach with media query overrides
+
+    Accessibility Considerations: Sufficient color contrast, focus states, and responsive text
+
+    Organization: Logical grouping of related styles with clear section comments
+
+This documentation provides complete understanding of each style rule's purpose and how they work 
+together to create a cohesive user interface.
+
+
+Index.html Documentation:
+Here's a thorough line-by-line documentation of your HTML code:
+
+<!DOCTYPE html>
+<!-- HTML5 document type declaration -->
+<html lang="en">
+<!-- Root element with language set to English -->
+
+<head>
+    <!-- Document metadata and resource links -->
+    <meta charset="UTF-8">
+    <!-- Character encoding set to UTF-8 for Unicode support -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Responsive viewport settings for mobile devices -->
+    
+    <title>Web Scraper Pro</title>
+    <!-- Page title shown in browser tabs -->
+    
+    <!-- External CSS and font imports -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Font Awesome for icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Google Fonts - Roboto with various weights -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <!-- Link to local CSS file using Flask's url_for -->
+    <link rel="icon" href="{{ url_for('static', filename='images/logo.png') }}">
+    <!-- Favicon link using Flask's url_for -->
+</head>
+
+<body>
+    <!-- Main content of the webpage -->
+    
+    <header class="header">
+        <!-- Site header section -->
+        <div class="container header-content">
+            <!-- Container for header content with centered max-width -->
+            <div class="logo">
+                <!-- Logo container -->
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Web Scraper Logo">
+                <!-- Logo image with alt text -->
+                <span>MAB MEDIA Web Scraper Pro</span>
+                <!-- Logo text -->
+            </div>
+            
+            <nav class="main-nav">
+                <!-- Main navigation -->
+                <ul>
+                    <!-- Unordered list for navigation items -->
+                    <li><a href="#" class="active"><i class="fas fa-home"></i> Home</a></li>
+                    <!-- Home link with icon and active class -->
+                    <li><a href="#"><i class="fas fa-book"></i> Docs</a></li>
+                    <!-- Documentation link with icon -->
+                    <li><a href="#"><i class="fas fa-cog"></i> Settings</a></li>
+                    <!-- Settings link with icon -->
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <!-- Main content area -->
+        <div class="container">
+            <!-- Container for main content with centered max-width -->
+            
+            <div class="alerts-container">
+                <!-- Container for alert messages -->
+                <div class="alert alert-success" id="successAlert" style="display: none;">
+                    <!-- Success alert (hidden by default) -->
+                    <i class="fas fa-check-circle"></i>
+                    <!-- Success icon -->
+                    <span>Scraping completed successfully!</span>
+                    <!-- Success message -->
+                    <button class="close-btn">&times;</button>
+                    <!-- Close button -->
+                </div>
+                <div class="alert alert-error" id="errorAlert" style="display: none;">
+                    <!-- Error alert (hidden by default) -->
+                    <i class="fas fa-exclamation-circle"></i>
+                    <!-- Error icon -->
+                    <span id="errorMessage">An error occurred during scraping.</span>
+                    <!-- Error message (dynamic content) -->
+                    <button class="close-btn">&times;</button>
+                    <!-- Close button -->
+                </div>
+            </div>
+
+            <div class="scraper-card">
+                <!-- Main scraper card/panel -->
+                <div class="card-header">
+                    <!-- Card header section -->
+                    <h2><i class="fas fa-spider"></i> Web Scraper</h2>
+                    <!-- Title with spider icon -->
+                    <p>Extract data from any website with our powerful scraping tool</p>
+                    <!-- Subtitle -->
+                </div>
+
+                <form id="scraperForm" class="scraper-form">
+                    <!-- Scraper form with ID for JavaScript targeting -->
+                    <div class="form-group">
+                        <!-- Form field group -->
+                        <label for="urls"><i class="fas fa-link"></i> Target URLs (one per line)</label>
+                        <!-- Label with link icon -->
+                        <textarea id="urls" name="urls" class="form-control" placeholder="https://example.com" required></textarea>
+                        <!-- Textarea for URLs with placeholder and required attribute -->
+                    </div>
+
+                    <div class="form-group">
+                        <!-- Form field group -->
+                        <label><i class="fas fa-sliders-h"></i> Extraction Options</label>
+                        <!-- Label with settings icon -->
+                        <div class="checkbox-grid">
+                            <!-- Grid layout for checkboxes -->
+                            <div class="checkbox-item">
+                                <!-- Individual checkbox item -->
+                                <input type="checkbox" id="extractLinks" name="extractLinks" checked>
+                                <!-- Checkbox input (checked by default) -->
+                                <label for="extractLinks">Links</label>
+                                <!-- Checkbox label -->
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="extractText" name="extractText" checked>
+                                <label for="extractText">Text Content</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="extractImages" name="extractImages" checked>
+                                <label for="extractImages">Images</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="extractTables" name="extractTables" checked>
+                                <label for="extractTables">Tables</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <!-- Form field group -->
+                        <label for="textSelector"><i class="fas fa-code"></i> Custom CSS Selector</label>
+                        <!-- Label with code icon -->
+                        <input type="text" id="textSelector" name="textSelector" class="form-control" placeholder=".article-content, #main-text">
+                        <!-- Text input for CSS selector with placeholder -->
+                    </div>
+
+                    <div class="form-row">
+                        <!-- Form row for side-by-side fields -->
+                        <div class="form-group">
+                            <!-- Form field group -->
+                            <label for="requestDelay"><i class="fas fa-clock"></i> Request Delay (s)</label>
+                            <!-- Label with clock icon -->
+                            <input type="number" id="requestDelay" name="requestDelay" class="form-control" min="0" step="0.1" value="1.0">
+                            <!-- Number input for delay with min, step, and default value -->
+                        </div>
+                        <div class="form-group">
+                            <label for="timeout"><i class="fas fa-hourglass-half"></i> Timeout (s)</label>
+                            <!-- Label with hourglass icon -->
+                            <input type="number" id="timeout" name="timeout" class="form-control" min="1" value="10">
+                            <!-- Number input for timeout with min and default value -->
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <!-- Form action buttons container -->
+                        <button type="submit" id="scrapeBtn" class="btn btn-primary">
+                            <!-- Primary submit button -->
+                            <i class="fas fa-search"></i> Start Scraping
+                            <!-- Button text with search icon -->
+                        </button>
+                        <button type="button" id="clearBtn" class="btn btn-secondary">
+                            <!-- Secondary clear button -->
+                            <i class="fas fa-trash"></i> Clear
+                            <!-- Button text with trash icon -->
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="loading-indicator" id="loadingIndicator" style="display: none;">
+                <!-- Loading indicator (hidden by default) -->
+                <div class="spinner"></div>
+                <!-- Animated spinner element -->
+                <p>Scraping in progress. Please wait...</p>
+                <!-- Loading message -->
+            </div>
+
+            <div class="results-container" id="resultsContainer" style="display: none;">
+                <!-- Results container (hidden by default) -->
+                <div class="results-header">
+                    <!-- Results header section -->
+                    <h3><i class="fas fa-file-alt"></i> Scraping Results</h3>
+                    <!-- Title with file icon -->
+                    <div class="export-buttons">
+                        <!-- Export buttons container -->
+                        <button id="exportJson" class="btn btn-outline">
+                            <!-- JSON export button -->
+                            <i class="fas fa-file-code"></i> JSON
+                            <!-- Button text with code file icon -->
+                        </button>
+                        <button id="exportCsv" class="btn btn-outline">
+                            <!-- CSV export button -->
+                            <i class="fas fa-file-csv"></i> CSV
+                            <!-- Button text with CSV file icon -->
+                        </button>
+                    </div>
+                </div>
+
+                <div class="results-tabs">
+                    <!-- Results tabs navigation -->
+                    <button class="tab-btn active" data-tab="summary">Summary</button>
+                    <!-- Summary tab button (active by default) -->
+                    <button class="tab-btn" data-tab="links">Links</button>
+                    <!-- Links tab button -->
+                    <button class="tab-btn" data-tab="text">Text</button>
+                    <!-- Text tab button -->
+                    <button class="tab-btn" data-tab="images">Images</button>
+                    <!-- Images tab button -->
+                    <button class="tab-btn" data-tab="tables">Tables</button>
+                    <!-- Tables tab button -->
+                </div>
+
+                <!-- Tab content sections -->
+                <div class="tab-content active" id="summaryTab"></div>
+                <!-- Summary tab content (active by default) -->
+                <div class="tab-content" id="linksTab"></div>
+                <!-- Links tab content -->
+                <div class="tab-content" id="textTab"></div>
+                <!-- Text tab content -->
+                <div class="tab-content" id="imagesTab"></div>
+                <!-- Images tab content -->
+                <div class="tab-content" id="tablesTab"></div>
+                <!-- Tables tab content -->
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <!-- Page footer -->
+        <div class="container">
+            <!-- Container for footer content -->
+            <p>&copy; 2023 MAB MEDIA Web Scraper Pro. All rights reserved.</p>
+            <!-- Copyright notice -->
+            <div class="footer-links">
+                <!-- Footer links container -->
+                <a href="#">Privacy Policy</a>
+                <!-- Privacy policy link -->
+                <a href="#">Terms of Service</a>
+                <!-- Terms of service link -->
+                <a href="#">Contact Us</a>
+                <!-- Contact link -->
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript includes -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <!-- Link to main JavaScript file using Flask's url_for -->
+</body>
+</html>
+
+Key Features Documented:
+
+    Document Structure:
+
+        Proper HTML5 doctype and language declaration
+
+        Logical sectioning with header, main, and footer
+
+    Responsive Meta Tags:
+
+        Viewport settings for mobile responsiveness
+
+        Character encoding declaration
+
+Resource Loading:
+
+    External CSS (Font Awesome, Google Fonts)
+
+    Local CSS and JavaScript files using Flask's url_for
+
+    Favicon setup
+
+
+Accessibility Features:
+
+    Semantic HTML elements
+
+    Proper labeling of form controls
+
+    Alt text for images    
+
+
+Form Design:
+
+    Organized form groups with icons
+
+    Proper input types (text, number, checkbox)
+
+    Input validation attributes (required, min, step)
+
+
+UI Components:
+
+    Alert system (success/error)
+
+    Loading indicator
+
+    Tabbed interface for results
+
+    Export functionality
+
+
+Styling Hooks:
+
+    Consistent class naming
+
+    ID attributes for JavaScript targeting
+
+    Data attributes for tab functionality
+
+
+Branding Elements:
+
+    Logo placement
+
+    Copyright information
+
+    Consistent naming ("MAB MEDIA Web Scraper Pro")
+
+
+Dynamic Elements:
+
+    Initially hidden containers (alerts, loading, results)
+
+    Tab content areas for dynamic population
+
+Footer Content:
+
+    Legal links
+
+    Copyright notice
+
+
+This documentation provides a complete understanding of each HTML element's purpose and how they work 
+together to create the web scraper interface. The structure follows best practices for accessibility, 
+responsiveness, and maintainability.
+
+SHELL_OUTPUT:
+
+$ python app.py
+ * Serving Flask app 'app'
+ * Debug mode: on
+INFO:werkzeug:WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:5000
+INFO:werkzeug:Press CTRL+C to quit
+INFO:werkzeug: * Restarting with stat
+WARNING:werkzeug: * Debugger is active!
+INFO:werkzeug: * Debugger PIN: 596-014-203
+INFO:werkzeug:127.0.0.1 - - [14/Jul/2025 13:37:39] "GET /static/images/logo.png HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Jul/2025 13:37:40] "GET /favicon.ico HTTP/1.1" 404 -
+INFO:werkzeug:127.0.0.1 - - [14/Jul/2025 13:37:48] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Jul/2025 13:37:48] "GET /static/css/styles.css HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [14/Jul/2025 13:37:48] "GET /static/js/app.js HTTP/1.1" 304 -
+INFO:werkzeug:127.0.0.1 - - [14/Jul/2025 13:37:48] "GET /static/images/logo.png HTTP/1.1" 200 -
+
+
+
+
+
+
+
 
 
