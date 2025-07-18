@@ -1,17 +1,38 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory
-from WebScraper import WebScraper  # Note: Capital 'W' to match your filename
+from WebScraper import WebScraper
 import os
 import json
 import csv
-from io import StringIO
 from datetime import datetime
 import logging
+from functools import wraps
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Helper function for Vercel detection
+def is_vercel():
+    return os.environ.get('VERCEL', '').lower() in ('1', 'true')
+
+# Improved static files handler
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    static_path = os.path.join(os.getcwd(), 'static') if is_vercel() else app.static_folder
+    return send_from_directory(static_path, filename)
+
+try:
+    import serverless_wsgi
+except ImportError:
+    serverless_wsgi = None
+
+def handler(event, context):
+    if serverless_wsgi is None:
+        raise RuntimeError("serverless-wsgi is not available")
+    return serverless_wsgi.handle_request(app, event, context)
+
 
 @app.route('/')
 def index():
@@ -75,12 +96,13 @@ def export_json():
             logger.error("No data provided for JSON export")
             return jsonify({'error': 'No data provided'}), 400
         
-        # Create temp directory if it doesn't exist
-        os.makedirs('temp', exist_ok=True)
+        # Create appropriate temp directory
+        temp_dir = '/tmp' if is_vercel() else 'temp'
+        os.makedirs(temp_dir, exist_ok=True)
         
         # Create filename with timestamp
         filename = f"scraped_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        filepath = os.path.join('temp', filename)
+        filepath = os.path.join(temp_dir, filename)
         
         # Write JSON data
         with open(filepath, 'w', encoding='utf-8') as f:
@@ -118,12 +140,13 @@ def export_csv():
             }
             flattened_data.append(flat_item)
         
-        # Create temp directory if it doesn't exist
-        os.makedirs('temp', exist_ok=True)
+        # Create appropriate temp directory
+        temp_dir = '/tmp' if is_vercel() else 'temp'
+        os.makedirs(temp_dir, exist_ok=True)
         
         # Create filename with timestamp
         filename = f"scraped_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-        filepath = os.path.join('temp', filename)
+        filepath = os.path.join(temp_dir, filename)
         
         # Write CSV data
         with open(filepath, 'w', newline='', encoding='utf-8') as f:
@@ -146,12 +169,17 @@ def export_csv():
 @app.route('/download/<filename>')
 def download_file(filename):
     try:
-        return send_from_directory('temp', filename, as_attachment=True)
+        temp_dir = '/tmp' if is_vercel() else 'temp'
+        return send_from_directory(temp_dir, filename, as_attachment=True)
     except Exception as e:
         logger.error(f"File download failed: {str(e)}")
         return jsonify({'error': 'File not found'}), 404
 
 if __name__ == '__main__':
-    # Create temp directory if it doesn't exist
-    os.makedirs('temp', exist_ok=True)
-    app.run(debug=True)
+    # Create appropriate temp directory
+    temp_dir = '/tmp' if is_vercel() else 'temp'
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    # Only run Flask dev server locally
+    if not is_vercel():
+        app.run(debug=True, port=3001)

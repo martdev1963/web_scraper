@@ -1998,6 +1998,1290 @@ The HTTP status code 304, "Not Modified", indicates that the requested resource 
 since the last time it was accessed by the client. This is a mechanism used for efficient caching, 
 where the browser or other client can reuse a locally stored version of the resource
 
+Here's a comprehensive guide to hosting your Flask web scraper on Vercel and answers about their free tier limitations:
+
+
+Hosting Flask Web Scraper on Vercel
+1. Prerequisites
+
+    Vercel account (free tier available)
+
+    Node.js installed (for Vercel CLI)
+
+    Your Flask app code (ensure it has requirements.txt)
+
+
+2. Convert Flask App for Vercel
+
+Vercel primarily hosts serverless functions, so we need to adapt your Flask app:
+
+A. Create vercel.json Configuration 
+
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "app.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "static/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "app.py"
+    }
+  ]
+}
+
+
+B. Modify app.py for Vercel
+
+from flask import Flask, send_from_directory
+import os
+
+app = Flask(__name__, static_folder='static')
+
+# Add this route to handle static files
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    return send_from_directory('static', filename)
+
+# Your existing routes...
+
+if __name__ == '__main__':
+    app.run()
+
+
+3. Deployment Steps
+
+    Install Vercel CLI:
+
+npm install -g vercel
+
+
+Login:
+
+vercel login
+
+
+Deploy:
+
+vercel --prod
+
+
+Follow prompts to link your project.
+
+4. Important Notes for Flask on Vercel
+
+    Database/Storage: Use external services (MongoDB Atlas, Supabase) as Vercel has no persistent storage
+
+    Environment Variables: Set via Vercel dashboard for API keys
+
+    Timeouts: Free tier has 10s timeout for Serverless Functions (upgrade needed for longer tasks)
+
+
+Vercel Free Tier Limitations
+Feature	Free Tier Limit	Solution for Multiple Apps
+Projects	Unlimited	Yes, host multiple apps
+Serverless Fns	100GB-hours/month	Monitor usage
+Bandwidth	100GB/month	Optimize assets
+Concurrency	1,000 invocations/day	Distribute usage
+
+
+Key Points:
+
+    You can host multiple apps on one account
+
+    Each app gets its own subdomain (app-name.vercel.app)
+
+    Shared resources across all projects (bandwidth, function invocations)
+
+
+Alternative Approach (Recommended)
+
+For Python web apps with scraping, consider:
+
+    Render.com (Free tier with longer timeouts)
+
+    PythonAnywhere (Beginner-friendly)
+
+    Railway.app ($5/month with generous free credits)
+
+
+Troubleshooting
+
+If you get deployment errors:
+
+    Check vercel.json matches your project structure
+
+    Ensure all dependencies are in requirements.txt
+
+    View logs in Vercel dashboard > Deployment > Logs
+
+
+For the logo issue specifically:
+
+    Verify the file exists at static/images/logo.png
+
+    Check case sensitivity (Logo.png ≠ logo.png)
+
+    Use absolute path in HTML: /static/images/logo.png
+
+Would you like me to provide specific instructions for any of the alternative hosting platforms?
+
+SHELL_OUTPUT:
+
+Martin@DESKTOP-HTLQ9GM MINGW64 ~/Documents/Coding/web_scraper (main)
+$ vercel --prod
+Vercel CLI 44.4.1
+? Set up and deploy “~\Documents\Coding\web_scraper”? yes
+? Which scope should contain your project? martdev1963's projects
+? Link to existing project? no
+? What’s your project’s name? web-scraper-prod
+? In which directory is your code located? ./
+🔗  Linked to martdev1963s-projects/web-scraper-prod (created .vercel and added it to .gitignore)
+🔍  Inspect: https://vercel.com/martdev1963s-projects/web-scraper-prod/33cfLscYMZkGWHM7NzfEqewZFKQY [2s]
+✅  Production: https://web-scraper-prod-7mc2uk7zg-martdev1963s-projects.vercel.app [2s]
+2025-07-15T15:42:13.879Z  Running build in Washington, D.C., USA (East) – iad1
+2025-07-15T15:42:13.880Z  Build machine configuration: 2 cores, 8 GB
+2025-07-15T15:42:13.895Z  Retrieving list of deployment files...
+2025-07-15T15:42:14.027Z  Previous build caches not available
+2025-07-15T15:42:14.208Z  Downloading 10 deployment files...
+2025-07-15T15:42:16.328Z  Running "vercel build"
+2025-07-15T15:42:16.828Z  Vercel CLI 44.3.0
+2025-07-15T15:42:17.013Z  WARN! Due to `builds` existing in your configuration file, the Build and Development Settings defined in your Project Settings will not apply. Learn More: https://vercel.link/unused-build-settings
+2025-07-15T15:42:17.033Z  Installing required dependencies...
+2025-07-15T15:42:20.621Z  Build Completed in /vercel/output [4s]
+2025-07-15T15:42:20.651Z  Deploying outputs...
+❗️  Due to `builds` existing in your configuration file, the Build and Development Settings defined in your Project Settings will not apply. Learn More: https://vercel.link/unused-build-settings
+
+Martin@DESKTOP-HTLQ9GM MINGW64 ~/Documents/Coding/web_scraper (main)
+
+
+**VERCEL CLOUD SERVER DEPLOYMENT TROUBLE-SHOOTING/ DEBUGGING.....
+
+Your vercel.json file has a few issues that need to be addressed:
+Problems with Your Configuration
+
+    Duplicate routes sections: You have two separate configuration objects in the same file (the second one overwrites the first)
+
+    Conflicting route handling: The first config sends everything to app.py, while the second tries to handle static files first
+
+    Redundant static build: You have both a builds entry for static files and a filesystem route handler
+
+Recommended Fix
+
+Here's a cleaner version that should work better:
+json
+
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "app.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "static/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "app.py"
+    }
+  ]
+}
+
+Key Improvements:
+
+    Single configuration object: Combines everything into one coherent config
+
+    Proper static file handling: Explicitly routes /static/ requests to static files first
+
+    Maintains Python build: Keeps your Python application build configuration
+
+    Clean routing: All other routes fall through to your Python app
+
+Additional Recommendations:
+
+    If you're using a Python framework like Flask or FastAPI, make sure:
+
+        Your app.py has the correct handler export
+
+        You've included all required dependencies in requirements.txt
+
+    For static files:
+
+        Ensure they're in the static directory
+
+        Verify file permissions (should be readable)
+
+    If you're still getting 500 errors:
+
+        Check the Vercel function logs for Python-specific errors
+
+        Make sure your Python version is compatible with Vercel's environment
+
+Troubleshooting Vercel Serverless Function Crash (500 Error)
+
+This error indicates your Vercel serverless function failed during execution. Here's how to diagnose and fix the issue:
+Common Causes
+
+    Unhandled exceptions in your function code
+
+    Missing dependencies not properly included in your deployment
+
+    Timeout issues (default is 10 seconds for Hobby plan)
+
+    Memory limits exceeded (default is 1024MB)
+
+    Environment variables not properly configured
+
+Debugging Steps
+
+    Check the logs:
+
+        Go to your Vercel dashboard
+
+        Navigate to the project > "Functions" tab
+
+        Look for error details in the logs for the failing function
+
+    Local testing:
+
+        Run vercel dev to test locally
+
+        Check for errors in your local terminal
+
+    Common fixes:
+    javascript
+
+    // Add proper error handling
+    export default async function handler(req, res) {
+      try {
+        // Your function logic
+        res.status(200).json({ success: true });
+      } catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({ error: error.message });
+      }
+    }
+
+    Check for:
+
+        Proper async/await handling if using asynchronous code
+
+        Correct request/response handling
+
+        Sufficient resources for your function's needs
+
+If you need more specific help:
+
+    Share the function code (redact sensitive info)
+
+    Provide the full error logs from Vercel
+
+    Let me know what the function is supposed to do
+
+The error ID iad1::7dtf8-1752594693922-f50072521408 can help Vercel support track the specific failure if you need to contact them.
+is this vercel.json file ok?
+
+{
+    "version": 2,
+    "builds": [
+      {
+        "src": "app.py",
+        "use": "@vercel/python"
+      },
+      {
+        "src": "static/**",
+        "use": "@vercel/static"
+      }
+    ],
+    "routes": [
+      {
+        "src": "/(.*)",
+        "dest": "app.py"
+      }
+    ]
+  }
+
+  {
+    "routes": [
+      { "handle": "filesystem" },
+      { "src": "/static/(.*)", "dest": "/static/$1" },
+      { "src": "/(.*)", "dest": "app.py" }
+    ]
+  }
+
+Your vercel.json file has a few issues that need to be addressed:
+Problems with Your Configuration
+
+    Duplicate routes sections: You have two separate configuration objects in the same file (the second one overwrites the first)
+
+    Conflicting route handling: The first config sends everything to app.py, while the second tries to handle static files first
+
+    Redundant static build: You have both a builds entry for static files and a filesystem route handler
+
+Recommended Fix
+
+Here's a cleaner version that should work better:
+json
+
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "app.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "static/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "app.py"
+    }
+  ]
+}
+
+Key Improvements:
+
+    Single configuration object: Combines everything into one coherent config
+
+    Proper static file handling: Explicitly routes /static/ requests to static files first
+
+    Maintains Python build: Keeps your Python application build configuration
+
+    Clean routing: All other routes fall through to your Python app
+
+Additional Recommendations:
+
+    If you're using a Python framework like Flask or FastAPI, make sure:
+
+        Your app.py has the correct handler export
+
+        You've included all required dependencies in requirements.txt
+
+    For static files:
+
+        Ensure they're in the static directory
+
+        Verify file permissions (should be readable)
+
+    If you're still getting 500 errors:
+
+        Check the Vercel function logs for Python-specific errors
+
+        Make sure your Python version is compatible with Vercel's environment
+
+
+
+SHELL OUTPUT AFTER RUNNING: vercel dev.....
+
+$ vercel dev
+Vercel CLI 44.4.1
+> Ready! Available at http://localhost:3000
+> Building @vercel/python:app.py
+(node:12952) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Installing required dependencies...
+> Built @vercel/python:app.py [11s]
+AssignProcessToJobObject: (87) The parameter is incorrect.
+LambdaError: RequestId: 64545dc9-68c0-4e60-a46c-a14038527d8a Process exited before completing request
+    at Lambda.<anonymous> (C:\Users\Martin\AppData\Roaming\npm\node_modules\vercel\node_modules\@vercel\fun\dist\src\index.js:114:27)
+    at Generator.next (<anonymous>)
+    at fulfilled (C:\Users\Martin\AppData\Roaming\npm\node_modules\vercel\node_modules\@vercel\fun\dist\src\index.js:28:58)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+Traceback (most recent call last):
+  File "C:\Users\Martin\AppData\Local\com.vercel.fun\Cache\runtimes\python\bootstrap.py", line 147, in <module>
+    lambda_runtime_main()
+  File "C:\Users\Martin\AppData\Local\com.vercel.fun\Cache\runtimes\python\bootstrap.py", line 127, in lambda_runtime_main
+    fn = lambda_runtime_get_handler()
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Martin\AppData\Local\com.vercel.fun\Cache\runtimes\python\bootstrap.py", line 113, in lambda_runtime_get_handler
+    mod = importlib.import_module(module_name)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python312\Lib\importlib\__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1381, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1354, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1325, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 929, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 994, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\Martin\AppData\Local\Temp\zeit-fun-9bc799e3155c3\vc__handler__python.py", line 14, in <module>
+    __vc_spec.loader.exec_module(__vc_module)
+  File "<frozen importlib._bootstrap_external>", line 994, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\Martin\AppData\Local\Temp\zeit-fun-9bc799e3155c3\app.py", line 1, in <module>
+    from flask import Flask, render_template, request, jsonify, send_from_directory
+  File "C:\Python312\Lib\site-packages\flask\__init__.py", line 5, in <module>
+    from . import json as json
+  File "C:\Python312\Lib\site-packages\flask\json\__init__.py", line 6, in <module>
+    from ..globals import current_app
+  File "C:\Python312\Lib\site-packages\flask\globals.py", line 25, in <module>
+    app_ctx: AppContext = LocalProxy(  # type: ignore[assignment]
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: LocalProxy.__init__() got an unexpected keyword argument 'unbound_message'
+AssignProcessToJobObject: (87) The parameter is incorrect.
+LambdaError: RequestId: be4ee913-1243-445d-8828-4e1407c74538 Process exited before completing request
+    at Lambda.<anonymous> (C:\Users\Martin\AppData\Roaming\npm\node_modules\vercel\node_modules\@vercel\fun\dist\src\index.js:114:27)
+    at Generator.next (<anonymous>)
+    at fulfilled (C:\Users\Martin\AppData\Roaming\npm\node_modules\vercel\node_modules\@vercel\fun\dist\src\index.js:28:58)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+Traceback (most recent call last):
+  File "C:\Users\Martin\AppData\Local\com.vercel.fun\Cache\runtimes\python\bootstrap.py", line 147, in <module>
+    lambda_runtime_main()
+  File "C:\Users\Martin\AppData\Local\com.vercel.fun\Cache\runtimes\python\bootstrap.py", line 127, in lambda_runtime_main
+    fn = lambda_runtime_get_handler()
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Martin\AppData\Local\com.vercel.fun\Cache\runtimes\python\bootstrap.py", line 113, in lambda_runtime_get_handler
+    mod = importlib.import_module(module_name)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python312\Lib\importlib\__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1381, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1354, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1325, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 929, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 994, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\Martin\AppData\Local\Temp\zeit-fun-9bc799e3155c3\vc__handler__python.py", line 14, in <module>
+    __vc_spec.loader.exec_module(__vc_module)
+  File "<frozen importlib._bootstrap_external>", line 994, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\Martin\AppData\Local\Temp\zeit-fun-9bc799e3155c3\app.py", line 1, in <module>
+    from flask import Flask, render_template, request, jsonify, send_from_directory
+  File "C:\Python312\Lib\site-packages\flask\__init__.py", line 5, in <module>
+    from . import json as json
+  File "C:\Python312\Lib\site-packages\flask\json\__init__.py", line 6, in <module>
+    from ..globals import current_app
+  File "C:\Python312\Lib\site-packages\flask\globals.py", line 25, in <module>
+    app_ctx: AppContext = LocalProxy(  # type: ignore[assignment]
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: LocalProxy.__init__() got an unexpected keyword argument 'unbound_message'
+
+
+The error you're encountering is related to a version mismatch between Flask and its dependencies, 
+specifically werkzeug. The key error is:
+
+TypeError: LocalProxy.__init__() got an unexpected keyword argument 'unbound_message'
+
+This occurs because newer versions of Werkzeug (>=2.1.0) made breaking changes that affect Flask. Here's how to fix it:
+
+Solution
+
+    Create or update your requirements.txt file with specific versions:
+
+Flask==2.0.3
+Werkzeug==2.0.3
+
+Delete your virtual environment (if using one) and reinstall dependencies:
+
+rm -rf venv       # On Windows: rmdir /s /q venv
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+Alternative Solutions
+
+If you want to use newer versions:
+
+    Option 1: Upgrade to Flask 2.2+ (requires code changes for compatibility)
+
+Flask>=2.2.0
+Werkzeug>=2.2.0
+
+Option 2: Use a compatible combination:
+
+Flask==2.1.0
+Werkzeug==2.1.0
+
+Additional Recommendations
+
+    Clear Vercel cache:
+
+vercel dev --clear
+
+Check your app.py to ensure it has the correct Vercel handler:
+
+from flask import Flask
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Hello World"
+
+# Vercel requires this handler
+def vercel_handler(event, context):
+    from vercel import Response
+    with app.app_context():
+        response = app.full_dispatch_request()
+        return Response(
+            response.get_data(),
+            status=response.status_code,
+            headers=dict(response.headers)
+        )
+
+    If using Python 3.12, be aware that some packages might not be fully compatible yet. 
+    Consider using Python 3.10 or 3.11 for better stability.
+
+After making these changes, try running vercel dev again. The error should be resolved 
+if the version conflicts are properly addressed.        
+
+
+vercel bug fix:
+
+Your app.py is mostly well-structured for Vercel, but needs a few adjustments for proper 
+serverless compatibility. Here's the corrected version with explanations:
+
+Key Issues Fixed:
+
+    Vercel Handler Implementation - Your current handler tries to use a non-existent vercel import
+
+    Static Files Configuration - Needs proper handling for serverless
+
+    Temp Directory Handling - Requires Vercel-specific approach
+
+
+Corrected app.py: 
+
+from flask import Flask, render_template, request, jsonify, send_from_directory
+from WebScraper import WebScraper
+import os
+import json
+import csv
+from datetime import datetime
+import logging
+
+app = Flask(__name__, static_folder='static')
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Vercel requires this specific handler format
+def handler(event, context):
+    from serverless_wsgi import handle_request
+    return handle_request(app, event, context)
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    return send_from_directory(app.static_folder, filename)
+
+# ... [keep all your existing routes unchanged] ...
+
+# Modified for Vercel compatibility
+@app.route('/download/<filename>')
+def download_file(filename):
+    try:
+        # Use /tmp directory which is writable in Vercel
+        temp_dir = '/tmp' if os.environ.get('VERCEL') else 'temp'
+        return send_from_directory(temp_dir, filename, as_attachment=True)
+    except Exception as e:
+        logger.error(f"File download failed: {str(e)}")
+        return jsonify({'error': 'File not found'}), 404
+
+if __name__ == '__main__':
+    # Create temp directory if it doesn't exist
+    temp_dir = '/tmp' if os.environ.get('VERCEL') else 'temp'
+    os.makedirs(temp_dir, exist_ok=True)
+    app.run(debug=True)
+
+Required Changes:
+
+    Add to requirements.txt:
+
+serverless-wsgi==3.0.0
+flask==2.0.3
+werkzeug==2.0.3
+
+Update vercel.json:
+
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "app.py",
+      "use": "@vercel/python",
+      "config": { 
+        "maxLambdaSize": "15mb",
+        "runtime": "python3.9"
+      }
+    },
+    {
+      "src": "static/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "app.py"
+    }
+  ]
+}
+
+Key Improvements:
+
+    Proper Vercel WSGI handler using serverless-wsgi
+
+    Environment-aware temp directory (uses /tmp on Vercel)
+
+    Correct static files handling for serverless environment
+
+    Explicit Python runtime in vercel.json
+
+    Increased Lambda size to accommodate dependencies
+
+
+Testing Locally:
+
+    Install the WSGI handler:
+
+pip install serverless-wsgi
+
+Test with:
+
+vercel dev
+
+This configuration should now work both locally and when deployed to Vercel. 
+The main difference is the handler implementation and proper filesystem handling for serverless environments.
+
+SHELL_OUTPUT:
+
+Martin@DESKTOP-HTLQ9GM MINGW64 ~/Documents/Coding/web_scraper (main)
+$ pip install serverless-wsgi
+Collecting serverless-wsgi
+  Downloading serverless_wsgi-3.1.0-py2.py3-none-any.whl.metadata (16 kB)
+Requirement already satisfied: werkzeug>2 in c:\python312\lib\site-packages (from serverless-wsgi) (3.0.1)
+Requirement already satisfied: MarkupSafe>=2.1.1 in c:\python312\lib\site-packages (from werkzeug>2->serverless-wsgi) (2.1.3)
+Downloading serverless_wsgi-3.1.0-py2.py3-none-any.whl (10 kB)
+Installing collected packages: serverless-wsgi
+Successfully installed serverless-wsgi-3.1.0
+
+Martin@DESKTOP-HTLQ9GM MINGW64 ~/Documents/Coding/web_scraper (main)
+$ pip install serverless-wsgi
+Collecting serverless-wsgi
+  Downloading serverless_wsgi-3.1.0-py2.py3-none-any.whl.metadata (16 kB)
+Requirement already satisfied: werkzeug>2 in c:\python312\lib\site-packages (from serverless-wsgi) (3.0.1)
+Requirement already satisfied: MarkupSafe>=2.1.1 in c:\python312\lib\site-packages (from werkzeug>2->serverless-wsgi) (2.1.3)
+Downloading serverless_wsgi-3.1.0-py2.py3-none-any.whl (10 kB)
+Installing collected packages: serverless-wsgi
+Successfully installed serverless-wsgi-3.1.0
+
+Martin@DESKTOP-HTLQ9GM MINGW64 ~/Documents/Coding/web_scraper (main)
+$ vercel dev
+Vercel CLI 44.4.1
+> NOTE: Requested port 3000 is already in use
+> Ready! Available at http://localhost:3001
+> Building @vercel/python:app.py
+(node:1788) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Installing required dependencies...
+> Built @vercel/python:app.py [17s]
+AssignProcessToJobObject: (87) The parameter is incorrect.
+LambdaError: RequestId: 65eb6f65-fffd-4d38-bd05-938280e88a59 Process exited before completing request
+    at Lambda.<anonymous> (C:\Users\Martin\AppData\Roaming\npm\node_modules\vercel\node_modules\@vercel\fun\dist\src\index.js:114:27)
+    at Generator.next (<anonymous>)
+    at fulfilled (C:\Users\Martin\AppData\Roaming\npm\node_modules\vercel\node_modules\@vercel\fun\dist\src\index.js:28:58)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+AssignProcessToJobObject: (87) The parameter is incorrect.
+LambdaError: RequestId: a5256ade-979c-4105-b0e5-c4af3ed8d6f4 Process exited before completing request
+    at Lambda.<anonymous> (C:\Users\Martin\AppData\Roaming\npm\node_modules\vercel\node_modules\@vercel\fun\dist\src\index.js:114:27)
+    at Generator.next (<anonymous>)
+    at fulfilled (C:\Users\Martin\AppData\Roaming\npm\node_modules\vercel\node_modules\@vercel\fun\dist\src\index.js:28:58)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+using Web Server Gateway Interface (WSGI)
+using Web Server Gateway Interface (WSGI)
+Traceback (most recent call last):
+  File "C:\Python312\Lib\urllib\request.py", line 1344, in do_open
+Traceback (most recent call last):
+  File "C:\Python312\Lib\urllib\request.py", line 1344, in do_open
+    h.request(req.get_method(), req.selector, req.data, headers,
+    h.request(req.get_method(), req.selector, req.data, headers,
+  File "C:\Python312\Lib\http\client.py", line 1319, in request
+  File "C:\Python312\Lib\http\client.py", line 1319, in request
+    self._send_request(method, url, body, headers, encode_chunked)
+  File "C:\Python312\Lib\http\client.py", line 1365, in _send_request
+    self._send_request(method, url, body, headers, encode_chunked)
+  File "C:\Python312\Lib\http\client.py", line 1365, in _send_request
+    self.endheaders(body, encode_chunked=encode_chunked)
+  File "C:\Python312\Lib\http\client.py", line 1314, in endheaders
+    self.endheaders(body, encode_chunked=encode_chunked)
+  File "C:\Python312\Lib\http\client.py", line 1314, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "C:\Python312\Lib\http\client.py", line 1074, in _send_output
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "C:\Python312\Lib\http\client.py", line 1074, in _send_output
+    self.send(msg)
+    self.send(msg)
+  File "C:\Python312\Lib\http\client.py", line 1018, in send
+    self.connect()
+  File "C:\Python312\Lib\http\client.py", line 984, in connect
+  File "C:\Python312\Lib\http\client.py", line 1018, in send
+    self.sock = self._create_connection(
+                ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python312\Lib\socket.py", line 852, in create_connection
+    self.connect()
+  File "C:\Python312\Lib\http\client.py", line 984, in connect
+    self.sock = self._create_connection(
+                ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python312\Lib\socket.py", line 852, in create_connection
+    raise exceptions[0]
+  File "C:\Python312\Lib\socket.py", line 837, in create_connection
+    raise exceptions[0]
+  File "C:\Python312\Lib\socket.py", line 837, in create_connection
+    sock.connect(sa)
+    sock.connect(sa)
+ConnectionRefusedError: [WinError 10061] No connection could be made because the target machine actively refused it
+
+During handling of the above exception, another exception occurred:
+
+ConnectionRefusedError: [WinError 10061] No connection could be made because the target machine actively refused it
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Martin\AppData\Local\com.vercel.fun\Cache\runtimes\python\bootstrap.py", line 147, in <module>
+Traceback (most recent call last):
+  File "C:\Users\Martin\AppData\Local\com.vercel.fun\Cache\runtimes\python\bootstrap.py", line 147, in <module>
+    lambda_runtime_main()
+    lambda_runtime_main()
+  File "C:\Users\Martin\AppData\Local\com.vercel.fun\Cache\runtimes\python\bootstrap.py", line 130, in lambda_runtime_main
+  File "C:\Users\Martin\AppData\Local\com.vercel.fun\Cache\runtimes\python\bootstrap.py", line 130, in lambda_runtime_main
+    (event, context) = lambda_runtime_next_invocation()
+    (event, context) = lambda_runtime_next_invocation()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Martin\AppData\Local\com.vercel.fun\Cache\runtimes\python\bootstrap.py", line 56, in lambda_runtime_next_invocation
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Martin\AppData\Local\com.vercel.fun\Cache\runtimes\python\bootstrap.py", line 56, in lambda_runtime_next_invocation
+    res = LambdaRequest('invocation/next')
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Martin\AppData\Local\com.vercel.fun\Cache\runtimes\python\bootstrap.py", line 31, in __init__
+    req = urllib.request.urlopen(url, data)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python312\Lib\urllib\request.py", line 215, in urlopen
+    res = LambdaRequest('invocation/next')
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python312\Lib\urllib\request.py", line 515, in open
+  File "C:\Users\Martin\AppData\Local\com.vercel.fun\Cache\runtimes\python\bootstrap.py", line 31, in __init__
+    response = self._open(req, data)
+    req = urllib.request.urlopen(url, data)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python312\Lib\urllib\request.py", line 215, in urlopen
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python312\Lib\urllib\request.py", line 532, in _open
+    return opener.open(url, data, timeout)
+    result = self._call_chain(self.handle_open, protocol, protocol +
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python312\Lib\urllib\request.py", line 492, in _call_chain
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python312\Lib\urllib\request.py", line 515, in open
+    result = func(*args)
+             ^^^^^^^^^^^
+    response = self._open(req, data)
+  File "C:\Python312\Lib\urllib\request.py", line 1373, in http_open
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python312\Lib\urllib\request.py", line 532, in _open
+    return self.do_open(http.client.HTTPConnection, req)
+    result = self._call_chain(self.handle_open, protocol, protocol +
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python312\Lib\urllib\request.py", line 1347, in do_open
+  File "C:\Python312\Lib\urllib\request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "C:\Python312\Lib\urllib\request.py", line 1373, in http_open
+    raise URLError(err)
+    return self.do_open(http.client.HTTPConnection, req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python312\Lib\urllib\request.py", line 1347, in do_open
+urllib.error.URLError: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
+    raise URLError(err)
+urllib.error.URLError: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
+
+
+The error you're encountering suggests there are several compatibility issues between your Python environment, 
+Flask/Werkzeug versions, and Vercel's serverless platform. Let's fix this systematically:
+
+Solution
+
+    First, update your requirements.txt with these specific versions:
+
+Flask==2.0.3
+Werkzeug==2.0.3
+serverless-wsgi==1.7.6  # Older but more stable version
+
+Modify your app.py handler to use this simpler format:
+
+# Replace your current handler with this:
+def handler(event, context):
+    from serverless_wsgi import handle_request
+    return handle_request(app, event, context)
+
+
+Update your vercel.json configuration:
+
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "app.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "15mb",
+        "runtime": "python3.9"
+      }
+    },
+    {
+      "src": "static/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "app.py"
+    }
+  ]
+}
+
+Critical Fixes Applied:
+
+    Python Version Compatibility:
+
+        Forced Python 3.9 in Vercel config (3.12 has known issues)
+
+        Pinned Werkzeug to 2.0.3 (newer versions break Flask 2.0.x)
+
+
+Serverless WSGI Fix:
+
+    Using older, more stable version of serverless-wsgi
+
+    Simplified handler implementation
+
+Connection Error Resolution:
+
+    The "connection refused" errors suggest port conflicts
+
+    Added explicit port configuration
+
+
+Additional Steps:
+
+    Clean your environment:
+
+rm -rf venv/ __pycache__/ .vercel/
+
+Create fresh virtual environment:
+
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+Try running with:
+
+vercel dev -p 3001  # Explicitly use port 3001
+
+If Still Having Issues:
+
+    Check for port conflicts:
+
+netstat -ano | findstr :3000  # Windows
+lsof -i :3000                # Mac/Linux
+
+
+Alternative run command:
+
+vercel dev --debug --listen 0.0.0.0:3001
+
+This combination has proven to work reliably with Vercel's Python runtime. 
+The key was downgrading both Werkzeug and serverless-wsgi to versions known to work well together.
+
+
+Replacing this funciton:
+
+# Vercel requires this handler
+def vercel_handler(event, context):
+    from vercel import Response
+    with app.app_context():
+        response = app.full_dispatch_request()
+        return Response(
+            response.get_data(),
+            status=response.status_code,
+            headers=dict(response.headers)
+        )
+
+
+with this:
+
+
+def handler(event, context):
+    from serverless_wsgi import handle_request
+    return handle_request(app, event, context)
+
+FURTHER DOCUMENTATON:
+
+https://chatgpt.com/c/6877d553-06c4-8009-8e44-fb18d512fce6
+DEBUGGING Vercel configuration snafus...
+
+Your app.py is very solid — nicely modular and clean. However, to make it 100% Vercel-ready, 
+there are 2 key fixes you should apply and a couple of optional polish items.
+
+✅ ✅ Must Fix: Vercel-Compatible handler
+
+🔥 Problem
+
+Your current handler(event, context) lives inside the script but isn't exposed globally, 
+and its structure risks triggering the issubclass error from Vercel’s runtime:
+
+TypeError: issubclass() arg 1 must be a class
+
+✅ Solution: Refactor handler at the bottom of the file
+
+Replace your current handler function with this simple, always-working version:
+
+try:
+    import serverless_wsgi
+except ImportError:
+    serverless_wsgi = None
+
+def handler(event, context):
+    if serverless_wsgi is None:
+        raise RuntimeError("serverless-wsgi is not available")
+    return serverless_wsgi.handle_request(app, event, context)
+
+📌 This needs to be outside any route, at module level, and should be below app = Flask(...) and route setup.
+
+✅ Fix #2: Ensure serverless-wsgi is in requirements.txt
+
+This is needed to make the handler function work.
+
+Run this to update it:
+
+pip install serverless-wsgi
+pip freeze > requirements.txt
+
+🧹 Optional Improvements (but nice for stability)
+🟡 1. Remove this fallback block:
+
+# Fallback for local development
+from flask import Response
+with app.app_context():
+    response = app.full_dispatch_request()
+    return Response(
+        response.get_data(),
+        status=response.status_code,
+        headers=dict(response.headers)
+    )
+
+It's never triggered by Vercel, and vercel dev doesn't use event, context anyway — 
+just call the Flask app locally with python app.py.
+
+🟡 2. Add vercel.json (if you don’t have one):
+
+{
+  "version": 2,
+  "builds": [
+    { "src": "app.py", "use": "@vercel/python" }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "app.py" }
+  ]
+}
+
+🧪 Final Checklist
+Item	Status
+
+Item	                            Status
+handler() correctly exposed	        ❗Fix needed
+serverless-wsgi installed	        ❗Ensure in requirements.txt
+/tmp usage OK for Vercel	        ✅ Good
+Local-only app.run(...) safe	    ✅ Good
+vercel.json defined	                ✅ Recommended
+Static file routing	                ✅ Handled properly
+JSON/CSV export logic	            ✅ Vercel-compatible
+
+✅ Final: Vercel-Ready Code Snippet (add to bottom of app.py)
+
+try:
+    import serverless_wsgi
+except ImportError:
+    serverless_wsgi = None
+
+def handler(event, context):
+    if serverless_wsgi is None:
+        raise RuntimeError("serverless-wsgi is not available")
+    return serverless_wsgi.handle_request(app, event, context)
+
+
+Let me know if you'd like me to generate a cleaned, ready-to-deploy version of your app.py and requirements.txt!
+
+
+SHELL_OUTPUT:
+
+Martin@DESKTOP-HTLQ9GM MINGW64 ~/Documents/Coding/web_scraper (main)
+$ pip install serverless-wsgi
+Collecting serverless-wsgi
+  Obtaining dependency information for serverless-wsgi from https://files.pythonhosted.org/packages/5f/b0/9b3fb4001807cf82fda139ce7db29a32b2a19005d7c6a0cd0c74776b8b4a/serverless_wsgi-3.1.0-py2.py3-none-any.whl.metadata
+  Downloading serverless_wsgi-3.1.0-py2.py3-none-any.whl.metadata (16 kB)
+Collecting werkzeug>2 (from serverless-wsgi)
+  Obtaining dependency information for werkzeug>2 from https://files.pythonhosted.org/packages/52/24/ab44c871b0f07f491e5d2ad12c9bd7358e527510618cb1b803a88e986db1/werkzeug-3.1.3-py3-none-any.whl.metadata
+  Downloading werkzeug-3.1.3-py3-none-any.whl.metadata (3.7 kB)
+Collecting MarkupSafe>=2.1.1 (from werkzeug>2->serverless-wsgi)
+  Obtaining dependency information for MarkupSafe>=2.1.1 from https://files.pythonhosted.org/packages/c1/80/a61f99dc3a936413c3ee4e1eecac96c0da5ed07ad56fd975f1a9da5bc630/MarkupSafe-3.0.2-cp312-cp312-win_amd64.whl.metadata
+  Using cached MarkupSafe-3.0.2-cp312-cp312-win_amd64.whl.metadata (4.1 kB)
+Downloading serverless_wsgi-3.1.0-py2.py3-none-any.whl (10 kB)
+Downloading werkzeug-3.1.3-py3-none-any.whl (224 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 224.5/224.5 kB 2.0 MB/s eta 0:00:00
+Using cached MarkupSafe-3.0.2-cp312-cp312-win_amd64.whl (15 kB)
+Installing collected packages: MarkupSafe, werkzeug, serverless-wsgi
+Successfully installed MarkupSafe-3.0.2 serverless-wsgi-3.1.0 werkzeug-3.1.3
+
+[notice] A new release of pip is available: 23.2.1 -> 25.1.1
+[notice] To update, run: python.exe -m pip install --upgrade pip
+
+Martin@DESKTOP-HTLQ9GM MINGW64 ~/Documents/Coding/web_scraper (main)
+$ pip freeze > requirements.txt
+
+Martin@DESKTOP-HTLQ9GM MINGW64 ~/Documents/Coding/web_scraper (main)
+
+Martin@DESKTOP-HTLQ9GM MINGW64 ~/Documents/Coding/web_scraper (main)
+$ pip install flask requests beautifulsoup4
+Collecting flask
+  Obtaining dependency information for flask from https://files.pythonhosted.org/packages/3d/68/9d4508e893976286d2ead7f8f571314af6c2037af34853a30fd769c02e9d/flask-3.1.1-py3-none-any.whl.metadata
+  Downloading flask-3.1.1-py3-none-any.whl.metadata (3.0 kB)
+Collecting requests
+  Obtaining dependency information for requests from https://files.pythonhosted.org/packages/7c/e4/56027c4a6b4ae70ca9de302488c5ca95ad4a39e190093d6c1a8ace08341b/requests-2.32.4-py3-none-any.whl.metadata
+  Using cached requests-2.32.4-py3-none-any.whl.metadata (4.9 kB)
+Collecting beautifulsoup4
+  Obtaining dependency information for beautifulsoup4 from https://files.pythonhosted.org/packages/50/cd/30110dc0ffcf3b131156077b90e9f60ed75711223f306da4db08eff8403b/beautifulsoup4-4.13.4-py3-none-any.whl.metadata
+  Using cached beautifulsoup4-4.13.4-py3-none-any.whl.metadata (3.8 kB)
+Collecting blinker>=1.9.0 (from flask)
+  Obtaining dependency information for blinker>=1.9.0 from https://files.pythonhosted.org/packages/10/cb/f2ad4230dc2eb1a74edf38f1a38b9b52277f75bef262d8908e60d957e13c/blinker-1.9.0-py3-none-any.whl.metadata
+  Downloading blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
+Collecting click>=8.1.3 (from flask)
+  Obtaining dependency information for click>=8.1.3 from https://files.pythonhosted.org/packages/85/32/10bb5764d90a8eee674e9dc6f4db6a0ab47c8c4d0d83c27f7c39ac415a4d/click-8.2.1-py3-none-any.whl.metadata
+  Using cached click-8.2.1-py3-none-any.whl.metadata (2.5 kB)
+Collecting itsdangerous>=2.2.0 (from flask)
+  Obtaining dependency information for itsdangerous>=2.2.0 from https://files.pythonhosted.org/packages/04/96/92447566d16df59b2a776c0fb82dbc4d9e07cd95062562af01e408583fc4/itsdangerous-2.2.0-py3-none-any.whl.metadata
+  Using cached itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
+Collecting jinja2>=3.1.2 (from flask)
+  Obtaining dependency information for jinja2>=3.1.2 from https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl.metadata
+  Using cached jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+Requirement already satisfied: markupsafe>=2.1.1 in c:\users\martin\documents\coding\web_scraper\venv\lib\site-packages (from flask) (3.0.2)
+Requirement already satisfied: werkzeug>=3.1.0 in c:\users\martin\documents\coding\web_scraper\venv\lib\site-packages (from flask) (3.1.3)
+Collecting charset_normalizer<4,>=2 (from requests)
+  Obtaining dependency information for charset_normalizer<4,>=2 from https://files.pythonhosted.org/packages/6c/4f/c02d5c493967af3eda9c771ad4d2bbc8df6f99ddbeb37ceea6e8716a32bc/charset_normalizer-3.4.2-cp312-cp312-win_amd64.whl.metadata
+  Using cached charset_normalizer-3.4.2-cp312-cp312-win_amd64.whl.metadata (36 kB)
+Collecting idna<4,>=2.5 (from requests)
+  Obtaining dependency information for idna<4,>=2.5 from https://files.pythonhosted.org/packages/76/c6/c88e154df9c4e1a2a66ccf0005a88dfb2650c1dffb6f5ce603dfbd452ce3/idna-3.10-py3-none-any.whl.metadata
+  Using cached idna-3.10-py3-none-any.whl.metadata (10 kB)
+Collecting urllib3<3,>=1.21.1 (from requests)
+  Obtaining dependency information for urllib3<3,>=1.21.1 from https://files.pythonhosted.org/packages/a7/c2/fe1e52489ae3122415c51f387e221dd0773709bad6c6cdaa599e8a2c5185/urllib3-2.5.0-py3-none-any.whl.metadata
+  Using cached urllib3-2.5.0-py3-none-any.whl.metadata (6.5 kB)
+Collecting certifi>=2017.4.17 (from requests)
+  Obtaining dependency information for certifi>=2017.4.17 from https://files.pythonhosted.org/packages/4f/52/34c6cf5bb9285074dc3531c437b3919e825d976fde097a7a73f79e726d03/certifi-2025.7.14-py3-none-any.whl.metadata
+  Using cached certifi-2025.7.14-py3-none-any.whl.metadata (2.4 kB)
+Collecting soupsieve>1.2 (from beautifulsoup4)
+  Obtaining dependency information for soupsieve>1.2 from https://files.pythonhosted.org/packages/e7/9c/0e6afc12c269578be5c0c1c9f4b49a8d32770a080260c333ac04cc1c832d/soupsieve-2.7-py3-none-any.whl.metadata
+  Using cached soupsieve-2.7-py3-none-any.whl.metadata (4.6 kB)
+Collecting typing-extensions>=4.0.0 (from beautifulsoup4)
+  Obtaining dependency information for typing-extensions>=4.0.0 from https://files.pythonhosted.org/packages/b5/00/d631e67a838026495268c2f6884f3711a15a9a2a96cd244fdaea53b823fb/typing_extensions-4.14.1-py3-none-any.whl.metadata
+  Using cached typing_extensions-4.14.1-py3-none-any.whl.metadata (3.0 kB)
+Collecting colorama (from click>=8.1.3->flask)
+  Obtaining dependency information for colorama from https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl.metadata
+  Using cached colorama-0.4.6-py2.py3-none-any.whl.metadata (17 kB)
+Downloading flask-3.1.1-py3-none-any.whl (103 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 103.3/103.3 kB 744.5 kB/s eta 0:00:00
+Using cached requests-2.32.4-py3-none-any.whl (64 kB)
+Using cached beautifulsoup4-4.13.4-py3-none-any.whl (187 kB)
+Downloading blinker-1.9.0-py3-none-any.whl (8.5 kB)
+Using cached certifi-2025.7.14-py3-none-any.whl (162 kB)
+Using cached charset_normalizer-3.4.2-cp312-cp312-win_amd64.whl (105 kB)
+Using cached click-8.2.1-py3-none-any.whl (102 kB)
+Using cached idna-3.10-py3-none-any.whl (70 kB)
+Using cached itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+Using cached jinja2-3.1.6-py3-none-any.whl (134 kB)
+Using cached soupsieve-2.7-py3-none-any.whl (36 kB)
+Using cached typing_extensions-4.14.1-py3-none-any.whl (43 kB)
+Using cached urllib3-2.5.0-py3-none-any.whl (129 kB)
+Using cached colorama-0.4.6-py2.py3-none-any.whl (25 kB)
+Installing collected packages: urllib3, typing-extensions, soupsieve, jinja2, itsdangerous, idna, colorama, charset_normalizer, certifi, blinker, requests, click, beautifulsoup4, flask
+Successfully installed beautifulsoup4-4.13.4 blinker-1.9.0 certifi-2025.7.14 charset_normalizer-3.4.2 click-8.2.1 colorama-0.4.6 flask-3.1.1 idna-3.10 itsdangerous-2.2.0 jinja2-3.1.6 requests-2.32.4 soupsieve-2.7 typing-extensions-4.14.1 urllib3-2.5.0
+
+[notice] A new release of pip is available: 23.2.1 -> 25.1.1
+[notice] To update, run: python.exe -m pip install --upgrade pip
+
+
+Then manually write your requirements.txt or:
+
+pip freeze | grep -E 'Flask|requests|beautifulsoup4|serverless-wsgi|Werkzeug|soupsieve' > requirements.txt
+
+
+✅ Why this matters on Vercel
+
+Vercel will auto-install from requirements.txt during build. If bs4 or requests is missing, 
+the deployment will crash with ModuleNotFoundError.
+
+Once updated, you're golden. Let me know if you'd like to add testing to your build!
+
+
+
+DEPLOYING ON VERCEL:
+
+✅ Local Development
+
+To run your Flask app locally (on your machine), use:
+
+python app.py
+
+This will start your server at http://localhost:3001 (based on your app.py), and it’s perfect for testing before deploying.
+🚀 Deploying to Vercel
+
+Vercel doesn't use vercel app.py — it builds and runs your app using serverless functions. Here's how to do it properly:
+1. ✅ Make sure your project structure is like this:
+
+my-webscraper-app/
+├── app.py
+├── WebScraper.py
+├── requirements.txt
+├── index.html (in a templates/ directory if using render_template)
+├── static/
+│   └── ... (any static assets)
+├── vercel.json (optional, see below)
+
+2. ✅ Add a vercel.json file (recommended):
+
+This tells Vercel how to handle your Python function.
+
+{
+  "functions": {
+    "app.py": {
+      "runtime": "python3.11"
+    }
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "app.py"
+    }
+  ]
+}
+
+    Put this file in your root project directory.
+
+3. ✅ Deploy with:
+
+vercel --prod
+
+Or, for testing it locally with the Vercel dev environment:
+
+vercel dev
+
+🧠 TL;DR:
+Purpose	Command
+Local testing	python app.py
+Vercel deployment	vercel or vercel --prod
+Local Vercel test	vercel dev
+Let me know if you'd like me to auto-generate a vercel.json or .gitignore for this project — I got you!
+
+
+Current SHELL_OUTPUT:
+
+ChatGPT said:
+
+You're seeing the TypeError: issubclass() arg 1 must be a class error because Vercel expects a specific entry point and is misinterpreting your module setup—which leads it to load the wrong base handler. Here’s how to smooth things out:
+🔧 Fix: Use index.py as Entry Point
+⏬ Why?
+
+As discovered from a real Stack Overflow solution, Vercel sometimes fails to load a custom Python server unless the primary file is named index.py, not app.py or server.py
+github.com+5stackoverflow.com+5vercel.com+5
+.
+✅ What You Should Do:
+
+    Create an index.py in your project root:
+
+from app import app
+
+handler = app  # Expose the Flask app directly
+
+    Simplify your app.py by removing the handler function there—you'll only need handler in index.py.
+
+    Update your vercel.json (in project root) to:
+
+{
+  "version": 2,
+  "builds": [
+    { "src": "index.py", "use": "@vercel/python" }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "index.py" }
+  ]
+}
+
+🧪 Alternative (If You Don’t Want to Rename)
+
+You can try setting an environment variable to fix a known Vercel bug:
+
+    Add VERCEL_CLI_VERSION="vercel@32.2.5" to your environment and ensure the CLI uses that version
+    community.vercel.com
+    github.com
+    .
+
+This is a temporary workaround—using index.py is more stable.
+✅ Summary
+
+    ✅ Create index.py that imports your Flask app and exposes it.
+
+    ✅ Remove handler from app.py (now handled via index.py).
+
+    ✅ Adjust vercel.json to point to index.py as your function entry.
+
+    ⚠ Optional: Use the VERCEL_CLI_VERSION env var hack if needed temporarily.
+
+Let me know if you want a quick snippet for index.py or more deployment tips!
+
+
+PROGNOSIS:
+NOT WORKING ON VERCEL SERVER...
+
 
 
 

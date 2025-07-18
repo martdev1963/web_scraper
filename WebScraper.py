@@ -21,6 +21,11 @@ import re
 import os
 from datetime import datetime
 
+#from selenium import webdriver
+#from selenium.webdriver.chrome.options import Options
+
+# Then use:
+#options = webdriver.ChromeOptions()  # Instead of just Options()
 
 class WebScraper:
     """A flexible web scraper class for extracting data from websites"""
